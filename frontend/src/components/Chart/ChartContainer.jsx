@@ -257,7 +257,7 @@ const ChartContainer = () => {
 
       <div className="chart-controls">
         <div className="indicator-toggles">
-          {['sma', 'ema', 'bollinger_bands', 'rsi', 'macd'].map(indicator => (
+          {['sma', 'ema', 'bollinger_bands', 'rsi', 'macd', 'stochastic', 'atr', 'adx', 'obv', 'volume_roc', 'ichimoku', 'fibonacci', 'support_resistance'].map(indicator => (
             <button
               key={indicator}
               className={`indicator-toggle ${selectedIndicators.includes(indicator) ? 'active' : ''}`}

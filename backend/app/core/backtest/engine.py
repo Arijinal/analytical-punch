@@ -283,7 +283,7 @@ class BacktestEngine:
             symbol=signal.symbol if hasattr(signal, 'symbol') else current_candle.name,
             direction='long' if signal.direction == 'buy' else 'short',
             entry_price=entry_price,
-            entry_time=pd.Timestamp(current_candle.name),
+            entry_time=pd.Timestamp(current_candle.name) if hasattr(current_candle, 'name') else datetime.now(),
             size=size,
             stop_loss=signal.stop_loss if hasattr(signal, 'stop_loss') else 
                      (entry_price * (1 - stop_loss) if stop_loss else None),
@@ -320,7 +320,16 @@ class BacktestEngine:
         else:  # short
             trade.profit = (trade.entry_price - exit_price) * trade.size
         
-        trade.profit_pct = (trade.profit / (trade.entry_price * trade.size)) * 100
+        # Ensure profit is not None
+        if trade.profit is None:
+            trade.profit = 0
+            
+        # Calculate profit percentage safely
+        entry_value = trade.entry_price * trade.size
+        if entry_value != 0:
+            trade.profit_pct = (trade.profit / entry_value) * 100
+        else:
+            trade.profit_pct = 0
         
         # Apply exit commission
         exit_commission = exit_price * trade.size * commission

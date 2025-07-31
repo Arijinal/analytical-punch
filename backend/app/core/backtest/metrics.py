@@ -19,15 +19,15 @@ class BacktestMetrics:
         
         # Basic metrics
         total_trades = len(portfolio.closed_trades)
-        winning_trades = [t for t in portfolio.closed_trades if t.profit > 0]
-        losing_trades = [t for t in portfolio.closed_trades if t.profit <= 0]
+        winning_trades = [t for t in portfolio.closed_trades if t.profit is not None and t.profit > 0]
+        losing_trades = [t for t in portfolio.closed_trades if t.profit is not None and t.profit <= 0]
         
         win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
         
-        # Profit/Loss metrics
-        total_profit = sum(t.profit for t in portfolio.closed_trades)
-        gross_profit = sum(t.profit for t in winning_trades)
-        gross_loss = sum(t.profit for t in losing_trades)
+        # Profit/Loss metrics - handle None values
+        total_profit = sum(t.profit for t in portfolio.closed_trades if t.profit is not None)
+        gross_profit = sum(t.profit for t in winning_trades if t.profit is not None)
+        gross_loss = sum(t.profit for t in losing_trades if t.profit is not None)
         
         # Average metrics
         avg_win = gross_profit / len(winning_trades) if winning_trades else 0
@@ -98,8 +98,8 @@ class BacktestMetrics:
             "avg_risk_reward_ratio": self._calculate_avg_rr(portfolio.closed_trades),
             
             # Additional stats
-            "best_trade": max(t.profit_pct for t in portfolio.closed_trades) if portfolio.closed_trades else 0,
-            "worst_trade": min(t.profit_pct for t in portfolio.closed_trades) if portfolio.closed_trades else 0,
+            "best_trade": max((t.profit_pct for t in portfolio.closed_trades if t.profit_pct is not None), default=0),
+            "worst_trade": min((t.profit_pct for t in portfolio.closed_trades if t.profit_pct is not None), default=0),
             "recovery_factor": total_profit / abs(max_drawdown) / initial_capital if max_drawdown != 0 else 0,
             "expectancy": (win_rate * avg_win) + ((1 - win_rate) * avg_loss) if total_trades > 0 else 0
         }

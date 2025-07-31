@@ -226,8 +226,286 @@ const Indicators = ({ chart, indicators, selectedIndicators }) => {
           }
           break;
 
+        case 'stochastic':
+          if (indicatorData.values && indicatorData.timestamps) {
+            // K line
+            const kSeries = chart.addLineSeries({
+              color: '#ff6600',
+              lineWidth: 2,
+              title: 'Stochastic %K',
+              crosshairMarkerVisible: false,
+            });
+
+            const kData = indicatorData.values
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (kData.length > 0) {
+              kSeries.setData(kData);
+              indicatorSeriesRef.current['stochastic_k'] = kSeries;
+            }
+          }
+
+          // D line
+          if (indicatorData.additional?.d_line && indicatorData.timestamps) {
+            const dSeries = chart.addLineSeries({
+              color: '#ff3300',
+              lineWidth: 1,
+              lineStyle: 2,
+              title: 'Stochastic %D',
+              crosshairMarkerVisible: false,
+            });
+
+            const dData = indicatorData.additional.d_line
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null);
+
+            dSeries.setData(dData);
+            indicatorSeriesRef.current['stochastic_d'] = dSeries;
+          }
+          break;
+
+        case 'atr':
+          if (indicatorData.values && indicatorData.timestamps) {
+            const series = chart.addLineSeries({
+              color: '#9933ff',
+              lineWidth: 2,
+              title: 'ATR',
+              crosshairMarkerVisible: false,
+            });
+
+            const formattedData = indicatorData.values
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (formattedData.length > 0) {
+              series.setData(formattedData);
+              indicatorSeriesRef.current['atr'] = series;
+            }
+          }
+          break;
+
+        case 'adx':
+          if (indicatorData.values && indicatorData.timestamps) {
+            const series = chart.addLineSeries({
+              color: '#00cccc',
+              lineWidth: 2,
+              title: 'ADX',
+              crosshairMarkerVisible: false,
+            });
+
+            const formattedData = indicatorData.values
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (formattedData.length > 0) {
+              series.setData(formattedData);
+              indicatorSeriesRef.current['adx'] = series;
+            }
+
+            // +DI and -DI lines
+            if (indicatorData.additional?.plus_di) {
+              const plusDiSeries = chart.addLineSeries({
+                color: '#00ff00',
+                lineWidth: 1,
+                lineStyle: 2,
+                crosshairMarkerVisible: false,
+              });
+
+              const plusDiData = indicatorData.additional.plus_di
+                .map((value, index) => ({
+                  time: indicatorData.timestamps[index],
+                  value: value
+                }))
+                .filter(d => d.value !== null);
+
+              plusDiSeries.setData(plusDiData);
+              indicatorSeriesRef.current['adx_plus_di'] = plusDiSeries;
+            }
+
+            if (indicatorData.additional?.minus_di) {
+              const minusDiSeries = chart.addLineSeries({
+                color: '#ff0000',
+                lineWidth: 1,
+                lineStyle: 2,
+                crosshairMarkerVisible: false,
+              });
+
+              const minusDiData = indicatorData.additional.minus_di
+                .map((value, index) => ({
+                  time: indicatorData.timestamps[index],
+                  value: value
+                }))
+                .filter(d => d.value !== null);
+
+              minusDiSeries.setData(minusDiData);
+              indicatorSeriesRef.current['adx_minus_di'] = minusDiSeries;
+            }
+          }
+          break;
+
+        case 'obv':
+          if (indicatorData.values && indicatorData.timestamps) {
+            const series = chart.addLineSeries({
+              color: '#666666',
+              lineWidth: 2,
+              title: 'OBV',
+              crosshairMarkerVisible: false,
+              priceScaleId: 'volume',
+            });
+
+            const formattedData = indicatorData.values
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (formattedData.length > 0) {
+              series.setData(formattedData);
+              indicatorSeriesRef.current['obv'] = series;
+            }
+          }
+          break;
+
+        case 'volume_roc':
+          if (indicatorData.values && indicatorData.timestamps) {
+            const series = chart.addLineSeries({
+              color: '#ff9966',
+              lineWidth: 2,
+              title: 'Volume ROC',
+              crosshairMarkerVisible: false,
+              priceScaleId: 'volume',
+            });
+
+            const formattedData = indicatorData.values
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (formattedData.length > 0) {
+              series.setData(formattedData);
+              indicatorSeriesRef.current['volume_roc'] = series;
+            }
+          }
+          break;
+
+        case 'fibonacci':
+          if (indicatorData.additional) {
+            const fibLevels = ['0.0', '0.236', '0.382', '0.5', '0.618', '0.786', '1.0'];
+            const colors = ['#ff0000', '#ff6600', '#ffaa00', '#00ff00', '#00aaff', '#0066ff', '#0000ff'];
+            
+            fibLevels.forEach((level, index) => {
+              const levelData = indicatorData.additional[`fib_${level}`];
+              if (levelData && indicatorData.timestamps) {
+                const series = chart.addLineSeries({
+                  color: colors[index],
+                  lineWidth: 1,
+                  lineStyle: 2,
+                  title: `Fib ${level}`,
+                  crosshairMarkerVisible: false,
+                });
+
+                const formattedData = levelData
+                  .map((value, idx) => ({
+                    time: indicatorData.timestamps[idx],
+                    value: value
+                  }))
+                  .filter(d => d.value !== null);
+
+                series.setData(formattedData);
+                indicatorSeriesRef.current[`fibonacci_${level}`] = series;
+              }
+            });
+          }
+          break;
+
+        case 'support_resistance':
+          if (indicatorData.additional) {
+            // Support levels
+            if (indicatorData.additional.support_levels) {
+              indicatorData.additional.support_levels.forEach((level, index) => {
+                if (level && indicatorData.timestamps) {
+                  const series = chart.addLineSeries({
+                    color: '#00ff00',
+                    lineWidth: 1,
+                    lineStyle: 2,
+                    title: `Support ${index + 1}`,
+                    crosshairMarkerVisible: false,
+                  });
+
+                  const formattedData = indicatorData.timestamps.map(time => ({
+                    time: time,
+                    value: level
+                  }));
+
+                  series.setData(formattedData);
+                  indicatorSeriesRef.current[`support_${index}`] = series;
+                }
+              });
+            }
+
+            // Resistance levels
+            if (indicatorData.additional.resistance_levels) {
+              indicatorData.additional.resistance_levels.forEach((level, index) => {
+                if (level && indicatorData.timestamps) {
+                  const series = chart.addLineSeries({
+                    color: '#ff0000',
+                    lineWidth: 1,
+                    lineStyle: 2,
+                    title: `Resistance ${index + 1}`,
+                    crosshairMarkerVisible: false,
+                  });
+
+                  const formattedData = indicatorData.timestamps.map(time => ({
+                    time: time,
+                    value: level
+                  }));
+
+                  series.setData(formattedData);
+                  indicatorSeriesRef.current[`resistance_${index}`] = series;
+                }
+              });
+            }
+          }
+          break;
+
         default:
-          // Handle other indicators as needed
+          // Handle any other indicators with basic line
+          if (indicatorData.values && indicatorData.timestamps) {
+            const series = chart.addLineSeries({
+              color: '#888888',
+              lineWidth: 2,
+              title: indicatorName.toUpperCase(),
+              crosshairMarkerVisible: false,
+            });
+
+            const formattedData = indicatorData.values
+              .map((value, index) => ({
+                time: indicatorData.timestamps[index],
+                value: value
+              }))
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (formattedData.length > 0) {
+              series.setData(formattedData);
+              indicatorSeriesRef.current[indicatorName] = series;
+            }
+          }
           break;
       }
     });
