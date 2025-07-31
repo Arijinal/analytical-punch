@@ -241,7 +241,7 @@ class BacktestEngine:
         if trade.stop_loss:
             if (trade.direction == 'long' and current_candle['low'] <= trade.stop_loss) or \
                (trade.direction == 'short' and current_candle['high'] >= trade.stop_loss):
-                exit_price = trade.stop_loss * (1 - slippage)
+                exit_price = trade.stop_loss * (1 - (slippage if slippage is not None else 0))
                 self._close_position(
                     portfolio, symbol, exit_price,
                     pd.Timestamp(current_candle.name),
@@ -253,7 +253,7 @@ class BacktestEngine:
         if trade.take_profit:
             if (trade.direction == 'long' and current_candle['high'] >= trade.take_profit) or \
                (trade.direction == 'short' and current_candle['low'] <= trade.take_profit):
-                exit_price = trade.take_profit * (1 + slippage)
+                exit_price = trade.take_profit * (1 + (slippage if slippage is not None else 0))
                 self._close_position(
                     portfolio, symbol, exit_price,
                     pd.Timestamp(current_candle.name),
@@ -274,7 +274,7 @@ class BacktestEngine:
         """Execute a trade based on signal"""
         # Calculate position size
         position_value = portfolio.cash * position_size
-        entry_price = current_candle['close'] * (1 + slippage)
+        entry_price = current_candle['close'] * (1 + (slippage if slippage is not None else 0))
         size = position_value / entry_price
         
         # Calculate commission
@@ -293,9 +293,10 @@ class BacktestEngine:
             entry_time=pd.Timestamp(current_candle.name) if hasattr(current_candle, 'name') else datetime.now(),
             size=size,
             stop_loss=signal.stop_loss if hasattr(signal, 'stop_loss') else 
-                     (entry_price * (1 - stop_loss) if stop_loss else None),
-            take_profit=signal.take_profit_levels[0] if hasattr(signal, 'take_profit_levels') else
-                       (entry_price * (1 + take_profit) if take_profit else None),
+                     (entry_price * (1 - stop_loss) if stop_loss is not None else None),
+            take_profit=(signal.take_profit_levels[0] if hasattr(signal, 'take_profit_levels') and 
+                        signal.take_profit_levels and len(signal.take_profit_levels) > 0 else
+                       (entry_price * (1 + take_profit) if take_profit is not None else None)),
             commission=trade_commission
         )
         
@@ -345,17 +346,20 @@ class BacktestEngine:
         
         # Apply exit commission
         exit_commission = exit_price * trade.size * commission
+        
+        # Ensure commission is not None before addition
+        if trade.commission is None:
+            trade.commission = 0
+            
         trade.commission += exit_commission
         
-        # Ensure commission is not None before subtraction
-        if trade.commission is None:
-            trade.commission = exit_commission
-        
         # Safely subtract commission from profit
-        if trade.profit is not None:
+        if trade.profit is not None and trade.commission is not None:
             trade.profit -= trade.commission
-        else:
+        elif trade.commission is not None:
             trade.profit = -trade.commission
+        else:
+            trade.profit = 0
         
         # Update portfolio
         portfolio.cash += (exit_price * trade.size - exit_commission)
