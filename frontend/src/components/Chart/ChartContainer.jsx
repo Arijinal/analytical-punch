@@ -16,7 +16,9 @@ const ChartContainer = () => {
     selectedIndicators,
     selectedSymbol,
     selectedTimeframe,
-    fetchChartData 
+    fetchChartData,
+    isLoading,
+    error
   } = useChartStore();
 
   // Initialize chart
@@ -112,27 +114,55 @@ const ChartContainer = () => {
   useEffect(() => {
     if (!candlestickSeriesRef.current || !volumeSeriesRef.current || !chartData) return;
 
-    // Format data for lightweight charts
-    const formattedCandles = chartData.map(candle => ({
-      time: candle.time,
-      open: candle.open,
-      high: candle.high,
-      low: candle.low,
-      close: candle.close,
-    }));
+    console.log('Chart data received:', chartData);
+    console.log('First candle:', chartData[0]);
 
-    const formattedVolume = chartData.map(candle => ({
-      time: candle.time,
-      value: candle.volume,
-      color: candle.close >= candle.open ? '#00ff8833' : '#ff336633',
-    }));
+    // Validate and format data for lightweight charts
+    const validCandles = chartData.filter(candle => {
+      const isValid = candle && 
+        candle.time !== undefined && 
+        candle.open !== undefined && 
+        candle.high !== undefined && 
+        candle.low !== undefined && 
+        candle.close !== undefined && 
+        candle.volume !== undefined;
+      
+      if (!isValid && candle) {
+        console.warn('Invalid candle data:', candle);
+      }
+      
+      return isValid;
+    });
 
-    candlestickSeriesRef.current.setData(formattedCandles);
-    volumeSeriesRef.current.setData(formattedVolume);
+    if (validCandles.length === 0) {
+      console.warn('No valid candle data to display');
+      return;
+    }
 
-    // Fit content
-    if (chartRef.current) {
-      chartRef.current.timeScale().fitContent();
+    try {
+      const formattedCandles = validCandles.map(candle => ({
+        time: candle.time,
+        open: Number(candle.open),
+        high: Number(candle.high),
+        low: Number(candle.low),
+        close: Number(candle.close),
+      }));
+
+      const formattedVolume = validCandles.map(candle => ({
+        time: candle.time,
+        value: Number(candle.volume),
+        color: Number(candle.close) >= Number(candle.open) ? '#00ff8833' : '#ff336633',
+      }));
+
+      candlestickSeriesRef.current.setData(formattedCandles);
+      volumeSeriesRef.current.setData(formattedVolume);
+
+      // Fit content
+      if (chartRef.current) {
+        chartRef.current.timeScale().fitContent();
+      }
+    } catch (error) {
+      console.error('Error setting chart data:', error);
     }
   }, [chartData]);
 
@@ -140,6 +170,30 @@ const ChartContainer = () => {
   useEffect(() => {
     fetchChartData();
   }, []);
+
+  // Show loading state
+  if (isLoading && !chartData) {
+    return (
+      <div className="chart-container">
+        <div className="chart-loading">
+          <div className="loading-spinner"></div>
+          <p>Loading chart data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error && !chartData) {
+    return (
+      <div className="chart-container">
+        <div className="chart-error">
+          <p>Error loading chart data: {error}</p>
+          <button onClick={fetchChartData}>Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="chart-container">
@@ -150,19 +204,32 @@ const ChartContainer = () => {
         </div>
         
         <div className="chart-stats">
-          {chartData && chartData.length > 0 && (
+          {chartData && Array.isArray(chartData) && chartData.length > 0 && chartData[chartData.length - 1] && (
             <>
               <div className="stat">
                 <span className="stat-label">Last:</span>
-                <span className="stat-value">${chartData[chartData.length - 1].close.toFixed(2)}</span>
+                <span className="stat-value">
+                  ${chartData[chartData.length - 1].close !== undefined && chartData[chartData.length - 1].close !== null
+                    ? Number(chartData[chartData.length - 1].close).toFixed(2) 
+                    : '0.00'}
+                </span>
               </div>
               <div className="stat">
                 <span className="stat-label">Change:</span>
                 <span className={`stat-value ${
-                  chartData[chartData.length - 1].close >= chartData[chartData.length - 2]?.close 
+                  chartData.length >= 2 && 
+                  chartData[chartData.length - 1]?.close !== undefined && 
+                  chartData[chartData.length - 2]?.close !== undefined &&
+                  Number(chartData[chartData.length - 1].close) >= Number(chartData[chartData.length - 2].close)
                     ? 'positive' : 'negative'
                 }`}>
-                  {((chartData[chartData.length - 1].close - chartData[0].close) / chartData[0].close * 100).toFixed(2)}%
+                  {chartData.length >= 2 && 
+                   chartData[0]?.close !== undefined && 
+                   chartData[0]?.close !== null &&
+                   chartData[chartData.length - 1]?.close !== undefined &&
+                   chartData[chartData.length - 1]?.close !== null
+                    ? ((Number(chartData[chartData.length - 1].close) - Number(chartData[0].close)) / Number(chartData[0].close) * 100).toFixed(2)
+                    : '0.00'}%
                 </span>
               </div>
             </>
