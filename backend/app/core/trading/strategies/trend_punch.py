@@ -84,7 +84,7 @@ class TrendPunchStrategy(TradingStrategy):
             # Risk management
             'min_risk_reward': 2.5,
             'max_holding_periods': 168,  # Hours (1 week max)
-            'min_confidence': 0.7,
+            'min_confidence': 0.4,  # Lowered from 0.7 to generate more signals
             'position_size_atr_factor': 0.02,  # 2% risk per ATR
             
             # Trend filters
@@ -135,17 +135,17 @@ class TrendPunchStrategy(TradingStrategy):
         
         try:
             # Calculate all indicators
-            sma_fast_values = self.sma_fast.calculate(df)
-            sma_medium_values = self.sma_medium.calculate(df)
-            sma_slow_values = self.sma_slow.calculate(df)
-            ema_fast_values = self.ema_fast.calculate(df)
-            ema_slow_values = self.ema_slow.calculate(df)
+            sma_fast_result = await self.sma_fast.calculate(df)
+            sma_medium_result = await self.sma_medium.calculate(df)
+            sma_slow_result = await self.sma_slow.calculate(df)
+            ema_fast_result = await self.ema_fast.calculate(df)
+            ema_slow_result = await self.ema_slow.calculate(df)
             
-            adx_data = self.adx.calculate(df).values
-            macd_data = self.macd.calculate(df)
-            rsi_values = self.rsi.calculate(df)
-            atr_values = self.atr.calculate(df)
-            obv_values = self.obv.calculate(df)
+            adx_result = await self.adx.calculate(df)
+            macd_result = await self.macd.calculate(df)
+            rsi_result = await self.rsi.calculate(df)
+            atr_result = await self.atr.calculate(df)
+            obv_result = await self.obv.calculate(df)
             
             # Get current values
             current_price = df['close'].iloc[-1]
@@ -158,8 +158,8 @@ class TrendPunchStrategy(TradingStrategy):
             
             # Analyze trend direction and strength
             trend_analysis = self._analyze_trend(
-                df, sma_fast_values, sma_medium_values, sma_slow_values,
-                ema_fast_values, ema_slow_values, adx_data, macd_data, obv_values
+                df, sma_fast_result, sma_medium_result, sma_slow_result,
+                ema_fast_result, ema_slow_result, adx_result, macd_result, obv_result
             )
             
             if not trend_analysis:
@@ -169,13 +169,13 @@ class TrendPunchStrategy(TradingStrategy):
             if trend_analysis['direction'] == 'bullish':
                 pullback_signal = self._check_bullish_pullback(
                     df, current_price, trend_analysis,
-                    sma_fast_values.iloc[-1], sma_medium_values.iloc[-1],
-                    rsi_values.iloc[-1], atr_values.iloc[-1], volume_ratio
+                    sma_fast_result.values.iloc[-1], sma_medium_result.values.iloc[-1],
+                    rsi_result.values.iloc[-1], atr_result.values.iloc[-1], volume_ratio
                 )
                 
                 if pullback_signal:
                     signal = self._create_trend_signal(
-                        symbol, current_price, current_time, atr_values.iloc[-1],
+                        symbol, current_price, current_time, atr_result.values.iloc[-1],
                         pullback_signal, 'buy', trend_analysis
                     )
                     if signal and signal.confidence >= self.parameters['min_confidence']:
@@ -185,13 +185,13 @@ class TrendPunchStrategy(TradingStrategy):
             elif trend_analysis['direction'] == 'bearish':
                 pullback_signal = self._check_bearish_pullback(
                     df, current_price, trend_analysis,
-                    sma_fast_values.iloc[-1], sma_medium_values.iloc[-1],
-                    rsi_values.iloc[-1], atr_values.iloc[-1], volume_ratio
+                    sma_fast_result.values.iloc[-1], sma_medium_result.values.iloc[-1],
+                    rsi_result.values.iloc[-1], atr_result.values.iloc[-1], volume_ratio
                 )
                 
                 if pullback_signal:
                     signal = self._create_trend_signal(
-                        symbol, current_price, current_time, atr_values.iloc[-1],
+                        symbol, current_price, current_time, atr_result.values.iloc[-1],
                         pullback_signal, 'sell', trend_analysis
                     )
                     if signal and signal.confidence >= self.parameters['min_confidence']:
@@ -206,36 +206,37 @@ class TrendPunchStrategy(TradingStrategy):
     def _analyze_trend(
         self,
         df: pd.DataFrame,
-        sma_fast: pd.Series,
-        sma_medium: pd.Series,
-        sma_slow: pd.Series,
-        ema_fast: pd.Series,
-        ema_slow: pd.Series,
-        adx_data: Dict[str, pd.Series],
-        macd_data: Dict[str, pd.Series],
-        obv_values: pd.Series
+        sma_fast_result: Any,  # IndicatorResult
+        sma_medium_result: Any,  # IndicatorResult
+        sma_slow_result: Any,  # IndicatorResult
+        ema_fast_result: Any,  # IndicatorResult
+        ema_slow_result: Any,  # IndicatorResult
+        adx_result: Any,  # IndicatorResult
+        macd_result: Any,  # IndicatorResult
+        obv_result: Any  # IndicatorResult
     ) -> Optional[Dict[str, Any]]:
         """Analyze overall trend direction and strength"""
         
         current_price = df['close'].iloc[-1]
         
         # Moving average alignment
-        sma_fast_current = sma_fast.iloc[-1]
-        sma_medium_current = sma_medium.iloc[-1]
-        sma_slow_current = sma_slow.iloc[-1]
-        ema_fast_current = ema_fast.iloc[-1]
-        ema_slow_current = ema_slow.iloc[-1]
+        sma_fast_current = sma_fast_result.values.iloc[-1]
+        sma_medium_current = sma_medium_result.values.iloc[-1]
+        sma_slow_current = sma_slow_result.values.iloc[-1]
+        ema_fast_current = ema_fast_result.values.iloc[-1]
+        ema_slow_current = ema_slow_result.values.iloc[-1]
         
         # ADX values
-        adx_current = adx_data['adx'].iloc[-1]
-        di_plus = adx_data['di_plus'].iloc[-1]
-        di_minus = adx_data['di_minus'].iloc[-1]
+        adx_current = adx_result.values.iloc[-1]  # ADX is the primary value
+        di_plus = adx_result.additional_series['di_plus'].iloc[-1]
+        di_minus = adx_result.additional_series['di_minus'].iloc[-1]
         
         # MACD values
-        macd_current = macd_data['macd'].iloc[-1]
-        macd_signal = macd_data['signal'].iloc[-1]
+        macd_current = macd_result.values.iloc[-1]  # MACD line
+        macd_signal = macd_result.additional_series['signal_line'].iloc[-1]
         
         # OBV trend
+        obv_values = obv_result.values
         obv_ma = obv_values.rolling(20).mean()
         obv_trend = 'rising' if obv_values.iloc[-1] > obv_ma.iloc[-1] else 'falling'
         
@@ -290,7 +291,7 @@ class TrendPunchStrategy(TradingStrategy):
             strength_score *= 0.5
         
         # Check if ADX is rising (strengthening trend)
-        adx_rising = adx_data['adx'].iloc[-1] > adx_data['adx'].iloc[-3]
+        adx_rising = adx_result.values.iloc[-1] > adx_result.values.iloc[-3]
         
         return {
             'direction': direction,

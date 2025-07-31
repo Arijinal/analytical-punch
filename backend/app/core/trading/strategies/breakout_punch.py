@@ -74,7 +74,7 @@ class BreakoutPunchStrategy(TradingStrategy):
             # Risk management
             'min_risk_reward': 2.0,
             'max_holding_periods': 72,  # Hours
-            'min_confidence': 0.65,
+            'min_confidence': 0.4,  # Lowered from 0.65 to generate more signals
             'false_breakout_threshold': 0.003,  # 0.3%
             
             # Filters
@@ -116,13 +116,13 @@ class BreakoutPunchStrategy(TradingStrategy):
         
         try:
             # Calculate indicators
-            bb_data = self.bb.calculate(df)
-            atr_values = self.atr.calculate(df)
-            sma_fast_values = self.sma_fast.calculate(df)
-            sma_slow_values = self.sma_slow.calculate(df)
-            ema_values = self.ema.calculate(df)
-            volume_roc_values = self.volume_roc.calculate(df)
-            obv_values = self.obv.calculate(df)
+            bb_result = await self.bb.calculate(df)
+            atr_result = await self.atr.calculate(df)
+            sma_fast_result = await self.sma_fast.calculate(df)
+            sma_slow_result = await self.sma_slow.calculate(df)
+            ema_result = await self.ema.calculate(df)
+            volume_roc_result = await self.volume_roc.calculate(df)
+            obv_result = await self.obv.calculate(df)
             
             # Get current values
             current_price = df['close'].iloc[-1]
@@ -138,14 +138,14 @@ class BreakoutPunchStrategy(TradingStrategy):
             
             # Check for bullish breakouts
             bullish_breakout = self._check_bullish_breakout(
-                df, current_price, bb_data, atr_values.iloc[-1],
-                sma_fast_values.iloc[-1], sma_slow_values.iloc[-1],
-                ema_values.iloc[-1], volume_ratio, ranges
+                df, current_price, bb_result, atr_result.values.iloc[-1],
+                sma_fast_result.values.iloc[-1], sma_slow_result.values.iloc[-1],
+                ema_result.values.iloc[-1], volume_ratio, ranges
             )
             
             if bullish_breakout:
                 signal = self._create_breakout_signal(
-                    symbol, current_price, current_time, atr_values.iloc[-1],
+                    symbol, current_price, current_time, atr_result.values.iloc[-1],
                     bullish_breakout, 'buy'
                 )
                 if signal and signal.confidence >= self.parameters['min_confidence']:
@@ -153,14 +153,14 @@ class BreakoutPunchStrategy(TradingStrategy):
             
             # Check for bearish breakouts
             bearish_breakout = self._check_bearish_breakout(
-                df, current_price, bb_data, atr_values.iloc[-1],
-                sma_fast_values.iloc[-1], sma_slow_values.iloc[-1],
-                ema_values.iloc[-1], volume_ratio, ranges
+                df, current_price, bb_result, atr_result.values.iloc[-1],
+                sma_fast_result.values.iloc[-1], sma_slow_result.values.iloc[-1],
+                ema_result.values.iloc[-1], volume_ratio, ranges
             )
             
             if bearish_breakout:
                 signal = self._create_breakout_signal(
-                    symbol, current_price, current_time, atr_values.iloc[-1],
+                    symbol, current_price, current_time, atr_result.values.iloc[-1],
                     bearish_breakout, 'sell'
                 )
                 if signal and signal.confidence >= self.parameters['min_confidence']:
@@ -222,7 +222,7 @@ class BreakoutPunchStrategy(TradingStrategy):
         self,
         df: pd.DataFrame,
         current_price: float,
-        bb_data: Dict[str, pd.Series],
+        bb_result: Any,  # IndicatorResult
         atr: float,
         sma_fast: float,
         sma_slow: float,
@@ -253,14 +253,18 @@ class BreakoutPunchStrategy(TradingStrategy):
         
         # Bollinger Band breakout
         max_score += 20
-        bb_upper = bb_data['upper'].iloc[-1]
-        bb_middle = bb_data['middle'].iloc[-1]
-        bb_width = (bb_data['upper'].iloc[-1] - bb_data['lower'].iloc[-1]) / bb_middle
+        bb_upper = bb_result.additional_series['upper_band'].iloc[-1]
+        bb_middle = bb_result.values.iloc[-1]  # Middle band
+        bb_lower = bb_result.additional_series['lower_band'].iloc[-1]
+        bb_width = (bb_upper - bb_lower) / bb_middle
         
         # Check for squeeze followed by expansion
         if bb_width <= self.parameters['squeeze_threshold']:
             # Was in squeeze
-            prev_bb_width = (bb_data['upper'].iloc[-2] - bb_data['lower'].iloc[-2]) / bb_data['middle'].iloc[-2]
+            prev_bb_upper = bb_result.additional_series['upper_band'].iloc[-2]
+            prev_bb_lower = bb_result.additional_series['lower_band'].iloc[-2]
+            prev_bb_middle = bb_result.values.iloc[-2]
+            prev_bb_width = (prev_bb_upper - prev_bb_lower) / prev_bb_middle
             if bb_width > prev_bb_width and current_price > bb_upper:
                 conditions['bb_squeeze_breakout'] = True
                 score += 20
@@ -303,7 +307,7 @@ class BreakoutPunchStrategy(TradingStrategy):
         
         confidence = score / max_score if max_score > 0 else 0
         
-        if confidence >= 0.6:
+        if confidence >= 0.4:  # Lowered to match min_confidence
             return {
                 'conditions': conditions,
                 'confidence': confidence,
@@ -320,7 +324,7 @@ class BreakoutPunchStrategy(TradingStrategy):
         self,
         df: pd.DataFrame,
         current_price: float,
-        bb_data: Dict[str, pd.Series],
+        bb_result: Any,  # IndicatorResult
         atr: float,
         sma_fast: float,
         sma_slow: float,
@@ -351,12 +355,16 @@ class BreakoutPunchStrategy(TradingStrategy):
         
         # Bollinger Band breakdown
         max_score += 20
-        bb_lower = bb_data['lower'].iloc[-1]
-        bb_middle = bb_data['middle'].iloc[-1]
-        bb_width = (bb_data['upper'].iloc[-1] - bb_data['lower'].iloc[-1]) / bb_middle
+        bb_lower = bb_result.additional_series['lower_band'].iloc[-1]
+        bb_middle = bb_result.values.iloc[-1]  # Middle band
+        bb_upper = bb_result.additional_series['upper_band'].iloc[-1]
+        bb_width = (bb_upper - bb_lower) / bb_middle
         
         if bb_width <= self.parameters['squeeze_threshold']:
-            prev_bb_width = (bb_data['upper'].iloc[-2] - bb_data['lower'].iloc[-2]) / bb_data['middle'].iloc[-2]
+            prev_bb_upper = bb_result.additional_series['upper_band'].iloc[-2]
+            prev_bb_lower = bb_result.additional_series['lower_band'].iloc[-2]
+            prev_bb_middle = bb_result.values.iloc[-2]
+            prev_bb_width = (prev_bb_upper - prev_bb_lower) / prev_bb_middle
             if bb_width > prev_bb_width and current_price < bb_lower:
                 conditions['bb_squeeze_breakdown'] = True
                 score += 20
@@ -399,7 +407,7 @@ class BreakoutPunchStrategy(TradingStrategy):
         
         confidence = score / max_score if max_score > 0 else 0
         
-        if confidence >= 0.6:
+        if confidence >= 0.4:  # Lowered to match min_confidence
             return {
                 'conditions': conditions,
                 'confidence': confidence,

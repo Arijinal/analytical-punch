@@ -81,7 +81,7 @@ class ValuePunchStrategy(TradingStrategy):
             # Risk management
             'min_risk_reward': 1.5,
             'max_holding_periods': 24,  # Hours
-            'min_confidence': 0.6,
+            'min_confidence': 0.4,  # Lowered from 0.6 to generate more signals
             
             # Mean reversion specific
             'price_distance_threshold': 0.02,  # 2% from mean
@@ -132,35 +132,35 @@ class ValuePunchStrategy(TradingStrategy):
         
         try:
             # Calculate all indicators
-            rsi_values = self.rsi.calculate(df)
-            stoch_data = self.stoch.calculate(df)
-            sma_short_values = self.sma_short.calculate(df)
-            sma_medium_values = self.sma_medium.calculate(df)
-            sma_long_values = self.sma_long.calculate(df) 
-            ema_values = self.ema.calculate(df)
-            bb_data = self.bb.calculate(df)
-            atr_values = self.atr.calculate(df)
-            fib_data = self.fib.calculate(df)
+            rsi_result = await self.rsi.calculate(df)
+            stoch_result = await self.stoch.calculate(df)
+            sma_short_result = await self.sma_short.calculate(df)
+            sma_medium_result = await self.sma_medium.calculate(df)
+            sma_long_result = await self.sma_long.calculate(df) 
+            ema_result = await self.ema.calculate(df)
+            bb_result = await self.bb.calculate(df)
+            atr_result = await self.atr.calculate(df)
+            fib_result = await self.fib.calculate(df)
             
             # Get current values
             current_price = df['close'].iloc[-1]
             current_volume = df['volume'].iloc[-1]
             current_time = df.index[-1]
             
-            rsi_current = rsi_values.iloc[-1]
-            stoch_k = stoch_data['%K'].iloc[-1]
-            stoch_d = stoch_data['%D'].iloc[-1]
+            rsi_current = rsi_result.values.iloc[-1]
+            stoch_k = stoch_result.values.iloc[-1]  # %K is the primary value
+            stoch_d = stoch_result.additional_series['slow_d'].iloc[-1]
             
-            sma_short_current = sma_short_values.iloc[-1]
-            sma_medium_current = sma_medium_values.iloc[-1]
-            sma_long_current = sma_long_values.iloc[-1]
-            ema_current = ema_values.iloc[-1]
+            sma_short_current = sma_short_result.values.iloc[-1]
+            sma_medium_current = sma_medium_result.values.iloc[-1]
+            sma_long_current = sma_long_result.values.iloc[-1]
+            ema_current = ema_result.values.iloc[-1]
             
-            bb_upper = bb_data['upper'].iloc[-1]
-            bb_lower = bb_data['lower'].iloc[-1]
-            bb_middle = bb_data['middle'].iloc[-1]
+            bb_upper = bb_result.additional_series['upper_band'].iloc[-1]
+            bb_lower = bb_result.additional_series['lower_band'].iloc[-1]
+            bb_middle = bb_result.values.iloc[-1]  # Middle band is the primary value
             
-            atr_current = atr_values.iloc[-1]
+            atr_current = atr_result.values.iloc[-1]
             
             # Volume analysis
             volume_ma = df['volume'].rolling(self.parameters['volume_ma_period']).mean().iloc[-1]
@@ -168,9 +168,9 @@ class ValuePunchStrategy(TradingStrategy):
             
             # Check for oversold bounce signal
             oversold_signal = self._check_oversold_conditions(
-                df, current_price, rsi_values, stoch_data, bb_data,
+                df, current_price, rsi_result, stoch_result, bb_result,
                 sma_short_current, sma_medium_current, sma_long_current,
-                ema_current, fib_data, volume_ratio, atr_current
+                ema_current, fib_result, volume_ratio, atr_current
             )
             
             if oversold_signal:
@@ -183,9 +183,9 @@ class ValuePunchStrategy(TradingStrategy):
             
             # Check for overbought pullback signal
             overbought_signal = self._check_overbought_conditions(
-                df, current_price, rsi_values, stoch_data, bb_data,
+                df, current_price, rsi_result, stoch_result, bb_result,
                 sma_short_current, sma_medium_current, sma_long_current,
-                ema_current, fib_data, volume_ratio, atr_current
+                ema_current, fib_result, volume_ratio, atr_current
             )
             
             if overbought_signal:
@@ -206,14 +206,14 @@ class ValuePunchStrategy(TradingStrategy):
         self,
         df: pd.DataFrame,
         current_price: float,
-        rsi_values: pd.Series,
-        stoch_data: Dict[str, pd.Series],
-        bb_data: Dict[str, pd.Series],
+        rsi_result: Any,  # IndicatorResult
+        stoch_result: Any,  # IndicatorResult
+        bb_result: Any,  # IndicatorResult
         sma_short: float,
         sma_medium: float,
         sma_long: float,
         ema: float,
-        fib_data: Dict[str, pd.Series],
+        fib_result: Any,  # IndicatorResult
         volume_ratio: float,
         atr: float
     ) -> Optional[Dict[str, Any]]:
@@ -225,8 +225,8 @@ class ValuePunchStrategy(TradingStrategy):
         
         # RSI oversold with potential reversal
         max_score += 25
-        rsi_current = rsi_values.iloc[-1]
-        rsi_prev = rsi_values.iloc[-2]
+        rsi_current = rsi_result.values.iloc[-1]
+        rsi_prev = rsi_result.values.iloc[-2]
         if rsi_current <= self.parameters['rsi_extreme_low']:
             if rsi_current > rsi_prev:  # Starting to turn up
                 conditions['rsi_oversold_reversal'] = True
@@ -237,14 +237,14 @@ class ValuePunchStrategy(TradingStrategy):
         
         # RSI bullish divergence
         max_score += 15
-        if self._check_rsi_bullish_divergence(df, rsi_values):
+        if self._check_rsi_bullish_divergence(df, rsi_result.values):
             conditions['rsi_bullish_divergence'] = True
             score += 15
         
         # Stochastic oversold
         max_score += 15
-        stoch_k = stoch_data['%K'].iloc[-1]
-        stoch_d = stoch_data['%D'].iloc[-1]
+        stoch_k = stoch_result.values.iloc[-1]  # %K
+        stoch_d = stoch_result.additional_series['slow_d'].iloc[-1]
         if (stoch_k <= self.parameters['stoch_oversold'] and 
             stoch_d <= self.parameters['stoch_oversold']):
             if stoch_k > stoch_d:  # K crossing above D
@@ -256,8 +256,8 @@ class ValuePunchStrategy(TradingStrategy):
         
         # Bollinger Band touch
         max_score += 15
-        bb_lower = bb_data['lower'].iloc[-1]
-        bb_middle = bb_data['middle'].iloc[-1]
+        bb_lower = bb_result.additional_series['lower_band'].iloc[-1]
+        bb_middle = bb_result.values.iloc[-1]  # Middle band
         distance_to_lower = (current_price - bb_lower) / bb_lower
         if distance_to_lower <= 0.01:  # Within 1% of lower band
             conditions['bb_lower_touch'] = True
@@ -283,7 +283,7 @@ class ValuePunchStrategy(TradingStrategy):
         
         # Fibonacci support level
         max_score += 10
-        if self._check_fibonacci_support(current_price, fib_data):
+        if self._check_fibonacci_support(current_price, fib_result):
             conditions['fib_support'] = True
             score += 10
         
@@ -323,14 +323,14 @@ class ValuePunchStrategy(TradingStrategy):
         self,
         df: pd.DataFrame,
         current_price: float,
-        rsi_values: pd.Series,
-        stoch_data: Dict[str, pd.Series],
-        bb_data: Dict[str, pd.Series],
+        rsi_result: Any,  # IndicatorResult
+        stoch_result: Any,  # IndicatorResult
+        bb_result: Any,  # IndicatorResult
         sma_short: float,
         sma_medium: float,
         sma_long: float,
         ema: float,
-        fib_data: Dict[str, pd.Series],
+        fib_result: Any,  # IndicatorResult
         volume_ratio: float,
         atr: float
     ) -> Optional[Dict[str, Any]]:
@@ -342,8 +342,8 @@ class ValuePunchStrategy(TradingStrategy):
         
         # RSI overbought with potential reversal
         max_score += 25
-        rsi_current = rsi_values.iloc[-1]
-        rsi_prev = rsi_values.iloc[-2]
+        rsi_current = rsi_result.values.iloc[-1]
+        rsi_prev = rsi_result.values.iloc[-2]
         if rsi_current >= self.parameters['rsi_extreme_high']:
             if rsi_current < rsi_prev:  # Starting to turn down
                 conditions['rsi_overbought_reversal'] = True
@@ -354,14 +354,14 @@ class ValuePunchStrategy(TradingStrategy):
         
         # RSI bearish divergence
         max_score += 15
-        if self._check_rsi_bearish_divergence(df, rsi_values):
+        if self._check_rsi_bearish_divergence(df, rsi_result.values):
             conditions['rsi_bearish_divergence'] = True
             score += 15
         
         # Stochastic overbought
         max_score += 15
-        stoch_k = stoch_data['%K'].iloc[-1]
-        stoch_d = stoch_data['%D'].iloc[-1]
+        stoch_k = stoch_result.values.iloc[-1]  # %K
+        stoch_d = stoch_result.additional_series['slow_d'].iloc[-1]
         if (stoch_k >= self.parameters['stoch_overbought'] and 
             stoch_d >= self.parameters['stoch_overbought']):
             if stoch_k < stoch_d:  # K crossing below D
@@ -373,7 +373,7 @@ class ValuePunchStrategy(TradingStrategy):
         
         # Bollinger Band touch
         max_score += 15
-        bb_upper = bb_data['upper'].iloc[-1]
+        bb_upper = bb_result.additional_series['upper_band'].iloc[-1]
         distance_to_upper = (bb_upper - current_price) / bb_upper
         if distance_to_upper <= 0.01:  # Within 1% of upper band
             conditions['bb_upper_touch'] = True
@@ -399,7 +399,7 @@ class ValuePunchStrategy(TradingStrategy):
         
         # Fibonacci resistance level
         max_score += 10
-        if self._check_fibonacci_resistance(current_price, fib_data):
+        if self._check_fibonacci_resistance(current_price, fib_result):
             conditions['fib_resistance'] = True
             score += 10
         
@@ -493,33 +493,36 @@ class ValuePunchStrategy(TradingStrategy):
         
         return False
     
-    def _check_fibonacci_support(self, current_price: float, fib_data: Dict[str, pd.Series]) -> bool:
+    def _check_fibonacci_support(self, current_price: float, fib_result: Any) -> bool:
         """Check if price is near Fibonacci support level"""
         try:
-            for level in self.parameters['fib_levels']:
-                fib_level_name = f'fib_{int(level*1000)}'
-                if fib_level_name in fib_data:
-                    fib_price = fib_data[fib_level_name].iloc[-1]
-                    tolerance = fib_price * self.parameters['fib_tolerance']
-                    
-                    if abs(current_price - fib_price) <= tolerance and current_price >= fib_price:
-                        return True
+            # Check if we have additional_series with fib levels
+            if hasattr(fib_result, 'additional_series'):
+                for level in self.parameters['fib_levels']:
+                    fib_level_name = f'fib_{int(level*1000)}'
+                    if fib_level_name in fib_result.additional_series:
+                        fib_price = fib_result.additional_series[fib_level_name].iloc[-1]
+                        tolerance = fib_price * self.parameters['fib_tolerance']
+                        
+                        if abs(current_price - fib_price) <= tolerance and current_price >= fib_price:
+                            return True
         except Exception:
             pass
         
         return False
     
-    def _check_fibonacci_resistance(self, current_price: float, fib_data: Dict[str, pd.Series]) -> bool:
+    def _check_fibonacci_resistance(self, current_price: float, fib_result: Any) -> bool:
         """Check if price is near Fibonacci resistance level"""
         try:
-            for level in self.parameters['fib_levels']:
-                fib_level_name = f'fib_{int(level*1000)}'
-                if fib_level_name in fib_data:
-                    fib_price = fib_data[fib_level_name].iloc[-1]
-                    tolerance = fib_price * self.parameters['fib_tolerance']
-                    
-                    if abs(current_price - fib_price) <= tolerance and current_price <= fib_price:
-                        return True
+            if hasattr(fib_result, 'additional_series'):
+                for level in self.parameters['fib_levels']:
+                    fib_level_name = f'fib_{int(level*1000)}'
+                    if fib_level_name in fib_result.additional_series:
+                        fib_price = fib_result.additional_series[fib_level_name].iloc[-1]
+                        tolerance = fib_price * self.parameters['fib_tolerance']
+                        
+                        if abs(current_price - fib_price) <= tolerance and current_price <= fib_price:
+                            return True
         except Exception:
             pass
         

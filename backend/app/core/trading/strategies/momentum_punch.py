@@ -71,7 +71,7 @@ class MomentumPunchStrategy(TradingStrategy):
             # Risk management
             'min_risk_reward': 2.0,
             'max_holding_periods': 48,  # Hours
-            'min_confidence': 0.65,
+            'min_confidence': 0.4,  # Lowered from 0.65 to generate more signals
             
             # Signal filtering
             'trend_filter': True,
@@ -115,37 +115,42 @@ class MomentumPunchStrategy(TradingStrategy):
         
         try:
             # Calculate all indicators
-            rsi_values = self.rsi.calculate(df)
-            macd_data = self.macd.calculate(df)
-            sma_fast_values = self.sma_fast.calculate(df)
-            sma_slow_values = self.sma_slow.calculate(df)
-            ema_values = self.ema.calculate(df)
-            bb_data = self.bb.calculate(df)
-            atr_values = self.atr.calculate(df)
+            rsi_result = await self.rsi.calculate(df)
+            macd_result = await self.macd.calculate(df)
+            sma_fast_result = await self.sma_fast.calculate(df)
+            sma_slow_result = await self.sma_slow.calculate(df)
+            ema_result = await self.ema.calculate(df)
+            bb_result = await self.bb.calculate(df)
+            atr_result = await self.atr.calculate(df)
             
             # Get current values (last row)
             current_price = df['close'].iloc[-1]
             current_volume = df['volume'].iloc[-1]
             current_time = df.index[-1]
             
-            rsi_current = rsi_values.iloc[-1]
-            rsi_prev = rsi_values.iloc[-2]
+            # RSI values
+            rsi_current = rsi_result.values.iloc[-1]
+            rsi_prev = rsi_result.values.iloc[-2]
             
-            macd_current = macd_data['macd'].iloc[-1]
-            macd_signal_current = macd_data['signal'].iloc[-1]
-            macd_hist_current = macd_data['histogram'].iloc[-1]
-            macd_hist_prev = macd_data['histogram'].iloc[-2]
+            # MACD values
+            macd_current = macd_result.values.iloc[-1]  # MACD line
+            macd_signal_current = macd_result.additional_series['signal_line'].iloc[-1]
+            macd_hist_current = macd_result.additional_series['histogram'].iloc[-1]
+            macd_hist_prev = macd_result.additional_series['histogram'].iloc[-2]
             
-            sma_fast_current = sma_fast_values.iloc[-1]
-            sma_slow_current = sma_slow_values.iloc[-1]
-            ema_current = ema_values.iloc[-1]
+            # Moving averages
+            sma_fast_current = sma_fast_result.values.iloc[-1]
+            sma_slow_current = sma_slow_result.values.iloc[-1]
+            ema_current = ema_result.values.iloc[-1]
             
-            bb_upper = bb_data['upper'].iloc[-1]
-            bb_lower = bb_data['lower'].iloc[-1]
-            bb_middle = bb_data['middle'].iloc[-1]
-            bb_width = (bb_upper - bb_lower) / bb_middle
+            # Bollinger Bands
+            bb_middle = bb_result.values.iloc[-1]  # Middle band (SMA)
+            bb_upper = bb_result.additional_series['upper_band'].iloc[-1]
+            bb_lower = bb_result.additional_series['lower_band'].iloc[-1]
+            bb_width = (bb_upper - bb_lower) / bb_middle if bb_middle != 0 else 0
             
-            atr_current = atr_values.iloc[-1]
+            # ATR
+            atr_current = atr_result.values.iloc[-1]
             
             # Volume analysis
             volume_ma = df['volume'].rolling(self.parameters['volume_ma_period']).mean().iloc[-1]
@@ -278,7 +283,8 @@ class MomentumPunchStrategy(TradingStrategy):
         
         confidence = score / max_score if max_score > 0 else 0
         
-        if confidence >= 0.6:  # At least 60% of conditions met
+        # Lower threshold to generate more signals while still maintaining quality
+        if confidence >= 0.4:  # At least 40% of conditions met
             return {
                 'conditions': conditions,
                 'confidence': confidence,
@@ -377,7 +383,7 @@ class MomentumPunchStrategy(TradingStrategy):
         
         confidence = score / max_score if max_score > 0 else 0
         
-        if confidence >= 0.6:
+        if confidence >= 0.4:
             return {
                 'conditions': conditions,
                 'confidence': confidence,
