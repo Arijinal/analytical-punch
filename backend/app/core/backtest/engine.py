@@ -72,6 +72,13 @@ class Portfolio:
         position_value = 0
         for symbol, trade in self.positions.items():
             current_price = current_prices.get(symbol, trade.entry_price)
+            # Ensure all values are not None
+            if current_price is None:
+                current_price = trade.entry_price
+            if trade.entry_price is None or trade.size is None:
+                logger.warning(f"Invalid trade values for {symbol}: entry_price={trade.entry_price}, size={trade.size}")
+                continue
+                
             if trade.direction == 'long':
                 position_value += trade.size * current_price
             else:  # short
@@ -314,13 +321,18 @@ class BacktestEngine:
         trade.exit_time = exit_time
         trade.exit_reason = exit_reason
         
-        # Calculate profit/loss
-        if trade.direction == 'long':
-            trade.profit = (exit_price - trade.entry_price) * trade.size
-        else:  # short
-            trade.profit = (trade.entry_price - exit_price) * trade.size
+        # Validate prices are not None
+        if exit_price is None or trade.entry_price is None or trade.size is None:
+            logger.error(f"Invalid price values in trade: exit_price={exit_price}, entry_price={trade.entry_price}, size={trade.size}")
+            trade.profit = 0
+        else:
+            # Calculate profit/loss
+            if trade.direction == 'long':
+                trade.profit = (exit_price - trade.entry_price) * trade.size
+            else:  # short
+                trade.profit = (trade.entry_price - exit_price) * trade.size
         
-        # Ensure profit is not None
+        # Ensure profit is not None before any operations
         if trade.profit is None:
             trade.profit = 0
             
@@ -334,7 +346,16 @@ class BacktestEngine:
         # Apply exit commission
         exit_commission = exit_price * trade.size * commission
         trade.commission += exit_commission
-        trade.profit -= trade.commission
+        
+        # Ensure commission is not None before subtraction
+        if trade.commission is None:
+            trade.commission = exit_commission
+        
+        # Safely subtract commission from profit
+        if trade.profit is not None:
+            trade.profit -= trade.commission
+        else:
+            trade.profit = -trade.commission
         
         # Update portfolio
         portfolio.cash += (exit_price * trade.size - exit_commission)
@@ -395,14 +416,14 @@ class BacktestEngine:
             "id": trade.id,
             "symbol": trade.symbol,
             "direction": trade.direction,
-            "entry_price": trade.entry_price,
-            "entry_time": trade.entry_time.isoformat(),
-            "exit_price": trade.exit_price,
+            "entry_price": trade.entry_price if trade.entry_price is not None else 0,
+            "entry_time": trade.entry_time.isoformat() if trade.entry_time else None,
+            "exit_price": trade.exit_price if trade.exit_price is not None else 0,
             "exit_time": trade.exit_time.isoformat() if trade.exit_time else None,
-            "size": trade.size,
-            "profit": trade.profit,
-            "profit_pct": trade.profit_pct,
-            "commission": trade.commission,
+            "size": trade.size if trade.size is not None else 0,
+            "profit": trade.profit if trade.profit is not None else 0,
+            "profit_pct": trade.profit_pct if trade.profit_pct is not None else 0,
+            "commission": trade.commission if trade.commission is not None else 0,
             "exit_reason": trade.exit_reason,
             "duration": str(trade.duration) if trade.duration else None
         }
