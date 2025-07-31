@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: analytical_punch_db
+    environment:
+      POSTGRES_USER: analytical
+      POSTGRES_PASSWORD: punch123
+      POSTGRES_DB: analytical_punch
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - analytical_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytical"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: analytical_punch_redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - analytical_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # pgAdmin for Database Management
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: analytical_punch_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@analytical.punch
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - analytical_network
+    depends_on:
+      - postgres
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: analytical_punch_backend
+    environment:
+      - DATABASE_URL=postgresql://analytical:punch123@postgres:5432/analytical_punch
+      - REDIS_URL=redis://redis:6379/0
+      - PERSONAL_MODE=${PERSONAL_MODE:-false}
+    volumes:
+      - ./backend:/app
+      - backend_logs:/app/logs
+    ports:
+      - "8000:8000"
+    networks:
+      - analytical_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: analytical_punch_frontend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000/api/v1
+      - REACT_APP_WS_URL=ws://localhost:8000/ws
+      - REACT_APP_PERSONAL_MODE=${PERSONAL_MODE:-false}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    networks:
+      - analytical_network
+    depends_on:
+      - backend
+    command: npm start
+
+networks:
+  analytical_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+  backend_logs:
