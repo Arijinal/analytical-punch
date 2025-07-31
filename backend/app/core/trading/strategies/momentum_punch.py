@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.core.trading.base import TradingStrategy, Signal
-from app.core.indicators.momentum import RSI, MACD, StochasticOscillator
-from app.core.indicators.trend import SMA, EMA
-from app.core.indicators.volatility import BollingerBands, ATR
+from app.core.indicators.momentum import RSIIndicator, MACDIndicator, StochasticIndicator
+from app.core.indicators.trend import SMAIndicator, EMAIndicator
+from app.core.indicators.volatility import BollingerBandsIndicator, ATRIndicator
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -85,20 +85,20 @@ class MomentumPunchStrategy(TradingStrategy):
         super().__init__("momentum_punch", default_params)
         
         # Initialize indicators
-        self.rsi = RSI(period=self.parameters['rsi_period'])
-        self.macd = MACD(
+        self.rsi = RSIIndicator(period=self.parameters['rsi_period'])
+        self.macd = MACDIndicator(
             fast=self.parameters['macd_fast'],
             slow=self.parameters['macd_slow'],
             signal=self.parameters['macd_signal']
         )
-        self.sma_fast = SMA(period=self.parameters['sma_fast'])
-        self.sma_slow = SMA(period=self.parameters['sma_slow'])
-        self.ema = EMA(period=self.parameters['ema_period'])
-        self.bb = BollingerBands(
+        self.sma_fast = SMAIndicator(period=self.parameters['sma_fast'])
+        self.sma_slow = SMAIndicator(period=self.parameters['sma_slow'])
+        self.ema = EMAIndicator(period=self.parameters['ema_period'])
+        self.bb = BollingerBandsIndicator(
             period=self.parameters['bb_period'],
             std_dev=self.parameters['bb_std']
         )
-        self.atr = ATR(period=self.parameters['atr_period'])
+        self.atr = ATRIndicator(period=self.parameters['atr_period'])
     
     async def generate_signals(
         self, 

@@ -10,6 +10,7 @@ from app.core.analysis.market_info import MarketAnalyzer
 from app.config import get_config
 from app.utils.cache import cached, usage_tracker
 from app.utils.logger import setup_logger
+from app.utils.serialization import make_json_serializable
 
 config = get_config()
 logger = setup_logger(__name__)
@@ -104,7 +105,8 @@ async def get_chart_data(
             }
         }
         
-        return response
+        # Ensure all values are JSON serializable
+        return make_json_serializable(response)
         
     except HTTPException:
         raise
@@ -174,14 +176,15 @@ def _format_ohlcv(df: pd.DataFrame) -> List[Dict[str, Any]]:
     candles = []
     
     for timestamp, row in df.iterrows():
-        candles.append({
-            "time": int(timestamp.timestamp()) if isinstance(timestamp, pd.Timestamp) else timestamp,
-            "open": float(row['open']),
-            "high": float(row['high']),
-            "low": float(row['low']),
-            "close": float(row['close']),
-            "volume": float(row['volume'])
-        })
+        candle = {
+            "time": make_json_serializable(timestamp),
+            "open": make_json_serializable(row['open']),
+            "high": make_json_serializable(row['high']),
+            "low": make_json_serializable(row['low']),
+            "close": make_json_serializable(row['close']),
+            "volume": make_json_serializable(row['volume'])
+        }
+        candles.append(candle)
     
     return candles
 
@@ -191,6 +194,14 @@ def _format_indicators(indicator_results: Dict) -> Dict[str, Any]:
     formatted = {}
     
     for name, result in indicator_results.items():
-        formatted[name] = result.to_dict()
+        try:
+            if hasattr(result, 'to_dict'):
+                formatted[name] = make_json_serializable(result.to_dict())
+            else:
+                # Handle any type properly
+                formatted[name] = make_json_serializable(result)
+        except Exception as e:
+            logger.warning(f"Error formatting indicator {name}: {e}")
+            formatted[name] = {}
     
     return formatted

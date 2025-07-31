@@ -4,8 +4,14 @@ from functools import lru_cache
 from dotenv import load_dotenv
 
 # Load environment variables
-load_dotenv('.env.personal')
-load_dotenv('.env', override=False)
+# Look for .env files in parent directory (project root)
+import sys
+from pathlib import Path
+backend_dir = Path(__file__).parent.parent
+project_root = backend_dir.parent
+
+load_dotenv(project_root / '.env.personal')
+load_dotenv(project_root / '.env', override=False)
 
 
 @lru_cache()
@@ -47,7 +53,7 @@ class Config:
         MAX_INDICATORS = None
         HISTORICAL_DAYS = 3650  # 10 years
         RATE_LIMITS = None
-        AVAILABLE_SOURCES = ['binance', 'yahoo', 'csv']
+        AVAILABLE_SOURCES = ['coingecko', 'kraken', 'coinbase', 'binance', 'yahoo', 'csv']
         ENABLE_ML_SIGNALS = True
         ENABLE_USAGE_TRACKING = True
         ENABLE_TRADE_JOURNAL = True
@@ -60,7 +66,7 @@ class Config:
         MAX_INDICATORS = 5
         HISTORICAL_DAYS = 90
         RATE_LIMITS = {'requests_per_minute': 60}
-        AVAILABLE_SOURCES = ['binance']
+        AVAILABLE_SOURCES = ['coingecko', 'kraken', 'coinbase']
         ENABLE_ML_SIGNALS = False
         ENABLE_USAGE_TRACKING = False
         ENABLE_TRADE_JOURNAL = False

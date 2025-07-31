@@ -513,7 +513,7 @@ alert_repository = AlertRepository()
 log_repository = SystemLogRepository()
 
 
-def initialize_trading_database():
+async def initialize_trading_database():
     """Initialize the trading database"""
     trading_db.initialize()
 

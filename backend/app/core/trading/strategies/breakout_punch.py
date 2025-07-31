@@ -9,9 +9,9 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.core.trading.base import TradingStrategy, Signal
-from app.core.indicators.volatility import BollingerBands, ATR
-from app.core.indicators.trend import SMA, EMA
-from app.core.indicators.volume import VolumeROC, OBV
+from app.core.indicators.volatility import BollingerBandsIndicator, ATRIndicator
+from app.core.indicators.trend import SMAIndicator, EMAIndicator
+from app.core.indicators.volume import VolumeROCIndicator, OBVIndicator
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -90,16 +90,16 @@ class BreakoutPunchStrategy(TradingStrategy):
         super().__init__("breakout_punch", default_params)
         
         # Initialize indicators
-        self.bb = BollingerBands(
+        self.bb = BollingerBandsIndicator(
             period=self.parameters['bb_period'],
             std_dev=self.parameters['bb_std']
         )
-        self.atr = ATR(period=self.parameters['atr_period'])
-        self.sma_fast = SMA(period=self.parameters['sma_fast'])
-        self.sma_slow = SMA(period=self.parameters['sma_slow'])
-        self.ema = EMA(period=self.parameters['ema_period'])
-        self.volume_roc = VolumeROC(period=5)
-        self.obv = OBV()
+        self.atr = ATRIndicator(period=self.parameters['atr_period'])
+        self.sma_fast = SMAIndicator(period=self.parameters['sma_fast'])
+        self.sma_slow = SMAIndicator(period=self.parameters['sma_slow'])
+        self.ema = EMAIndicator(period=self.parameters['ema_period'])
+        self.volume_roc = VolumeROCIndicator(period=5)
+        self.obv = OBVIndicator()
     
     async def generate_signals(
         self, 

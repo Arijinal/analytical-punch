@@ -9,10 +9,10 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.core.trading.base import TradingStrategy, Signal
-from app.core.indicators.momentum import RSI, StochasticOscillator
-from app.core.indicators.trend import SMA, EMA
-from app.core.indicators.volatility import BollingerBands, ATR
-from app.core.indicators.levels import FibonacciRetracement
+from app.core.indicators.momentum import RSIIndicator, StochasticIndicator
+from app.core.indicators.trend import SMAIndicator, EMAIndicator
+from app.core.indicators.volatility import BollingerBandsIndicator, ATRIndicator
+from app.core.indicators.levels import FibonacciIndicator
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -100,22 +100,22 @@ class ValuePunchStrategy(TradingStrategy):
         super().__init__("value_punch", default_params)
         
         # Initialize indicators
-        self.rsi = RSI(period=self.parameters['rsi_period'])
-        self.stoch = StochasticOscillator(
+        self.rsi = RSIIndicator(period=self.parameters['rsi_period'])
+        self.stoch = StochasticIndicator(
             k_period=self.parameters['stoch_k_period'],
             d_period=self.parameters['stoch_d_period'],
             smooth=self.parameters['stoch_smooth']
         )
-        self.sma_short = SMA(period=self.parameters['sma_short'])
-        self.sma_medium = SMA(period=self.parameters['sma_medium'])
-        self.sma_long = SMA(period=self.parameters['sma_long'])
-        self.ema = EMA(period=self.parameters['ema_period'])
-        self.bb = BollingerBands(
+        self.sma_short = SMAIndicator(period=self.parameters['sma_short'])
+        self.sma_medium = SMAIndicator(period=self.parameters['sma_medium'])
+        self.sma_long = SMAIndicator(period=self.parameters['sma_long'])
+        self.ema = EMAIndicator(period=self.parameters['ema_period'])
+        self.bb = BollingerBandsIndicator(
             period=self.parameters['bb_period'],
             std_dev=self.parameters['bb_std']
         )
-        self.atr = ATR(period=self.parameters['atr_period'])
-        self.fib = FibonacciRetracement(lookback=self.parameters['fib_lookback'])
+        self.atr = ATRIndicator(period=self.parameters['atr_period'])
+        self.fib = FibonacciIndicator(lookback=self.parameters['fib_lookback'])
     
     async def generate_signals(
         self, 

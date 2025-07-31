@@ -9,10 +9,11 @@ from datetime import datetime, timedelta
 import uuid
 
 from app.core.trading.base import TradingStrategy, Signal
-from app.core.indicators.trend import SMA, EMA, MACD, ADX
-from app.core.indicators.momentum import RSI
-from app.core.indicators.volatility import ATR
-from app.core.indicators.volume import OBV
+from app.core.indicators.trend import SMAIndicator, EMAIndicator
+from app.core.indicators.momentum import RSIIndicator, MACDIndicator
+from app.core.indicators.volatility import ATRIndicator
+from app.core.indicators.volume import OBVIndicator
+from app.core.indicators.adx import ADXIndicator
 from app.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -103,21 +104,21 @@ class TrendPunchStrategy(TradingStrategy):
         super().__init__("trend_punch", default_params)
         
         # Initialize indicators
-        self.sma_fast = SMA(period=self.parameters['sma_fast'])
-        self.sma_medium = SMA(period=self.parameters['sma_medium'])
-        self.sma_slow = SMA(period=self.parameters['sma_slow'])
-        self.ema_fast = EMA(period=self.parameters['ema_fast'])
-        self.ema_slow = EMA(period=self.parameters['ema_slow'])
+        self.sma_fast = SMAIndicator(period=self.parameters['sma_fast'])
+        self.sma_medium = SMAIndicator(period=self.parameters['sma_medium'])
+        self.sma_slow = SMAIndicator(period=self.parameters['sma_slow'])
+        self.ema_fast = EMAIndicator(period=self.parameters['ema_fast'])
+        self.ema_slow = EMAIndicator(period=self.parameters['ema_slow'])
         
-        self.adx = ADX(period=self.parameters['adx_period'])
-        self.macd = MACD(
+        self.adx = ADXIndicator(period=self.parameters['adx_period'])
+        self.macd = MACDIndicator(
             fast=self.parameters['macd_fast'],
             slow=self.parameters['macd_slow'],
             signal=self.parameters['macd_signal']
         )
-        self.rsi = RSI(period=self.parameters['rsi_period'])
-        self.atr = ATR(period=self.parameters['atr_period'])
-        self.obv = OBV()
+        self.rsi = RSIIndicator(period=self.parameters['rsi_period'])
+        self.atr = ATRIndicator(period=self.parameters['atr_period'])
+        self.obv = OBVIndicator()
     
     async def generate_signals(
         self, 
@@ -140,7 +141,7 @@ class TrendPunchStrategy(TradingStrategy):
             ema_fast_values = self.ema_fast.calculate(df)
             ema_slow_values = self.ema_slow.calculate(df)
             
-            adx_data = self.adx.calculate(df)
+            adx_data = self.adx.calculate(df).values
             macd_data = self.macd.calculate(df)
             rsi_values = self.rsi.calculate(df)
             atr_values = self.atr.calculate(df)

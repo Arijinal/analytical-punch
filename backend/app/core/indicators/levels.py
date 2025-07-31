@@ -91,7 +91,7 @@ class FibonacciIndicator(Indicator):
         
         # Forward fill Fibonacci levels
         for level_name in fib_levels:
-            fib_levels[level_name] = fib_levels[level_name].fillna(method='ffill')
+            fib_levels[level_name] = fib_levels[level_name].ffill()
         
         # Generate signals based on Fibonacci levels
         signals = pd.Series(0, index=df.index)
@@ -301,8 +301,8 @@ class SupportResistanceIndicator(Indicator):
             all_levels.append(valid_levels)
         
         # Forward fill levels
-        support_levels = support_levels.fillna(method='ffill')
-        resistance_levels = resistance_levels.fillna(method='ffill')
+        support_levels = support_levels.ffill()
+        resistance_levels = resistance_levels.ffill()
         
         # Generate signals based on level breaks
         signals = pd.Series(0, index=df.index)

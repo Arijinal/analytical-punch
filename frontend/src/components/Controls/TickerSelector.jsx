@@ -109,7 +109,7 @@ const TickerSelector = () => {
       
       {/* Quick access buttons for popular symbols */}
       <div className="quick-symbols">
-        {['BTC/USDT', 'ETH/USDT', 'AAPL', 'SPY'].map(symbol => (
+        {['BTC-USD', 'ETH-USD', 'AAPL', 'SPY'].map(symbol => (
           <button
             key={symbol}
             className={`quick-symbol ${selectedSymbol === symbol ? 'active' : ''}`}

@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 const useChartStore = create((set, get) => ({
   // State
-  selectedSymbol: 'BTC/USDT',
+  selectedSymbol: 'BTC-USD',
   selectedTimeframe: '1h',
   chartData: null,
   indicators: {},
@@ -18,9 +18,26 @@ const useChartStore = create((set, get) => ({
   availableIndicators: [],
   selectedIndicators: ['sma', 'rsi', 'macd'],
   
+  // Symbol normalization function
+  normalizeSymbol: (symbol) => {
+    // Convert common formats to standard format
+    if (!symbol) return 'BTC-USD';
+    
+    // Handle slash notation (BTC/USD -> BTC-USD)
+    let normalized = symbol.replace('/', '-').toUpperCase();
+    
+    // Handle USDT conversion to USD for better source compatibility
+    if (normalized.endsWith('-USDT')) {
+      normalized = normalized.replace('-USDT', '-USD');
+    }
+    
+    return normalized;
+  },
+  
   // Actions
   setSymbol: (symbol) => {
-    set({ selectedSymbol: symbol });
+    const normalized = get().normalizeSymbol(symbol);
+    set({ selectedSymbol: normalized });
     get().fetchChartData();
   },
   
@@ -40,13 +57,16 @@ const useChartStore = create((set, get) => ({
   },
   
   fetchChartData: async () => {
-    const { selectedSymbol, selectedTimeframe, selectedIndicators } = get();
+    const { selectedSymbol, selectedTimeframe, selectedIndicators, normalizeSymbol } = get();
     
     set({ isLoading: true, error: null });
     
     try {
+      // Ensure symbol is normalized before sending to API
+      const normalizedSymbol = normalizeSymbol(selectedSymbol);
+      
       const response = await api.getChartData(
-        selectedSymbol,
+        normalizedSymbol,
         selectedTimeframe,
         selectedIndicators
       );
