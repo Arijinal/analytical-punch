@@ -7,9 +7,10 @@ from typing import Dict, Set
 import logging
 
 from app.config import get_config
-from app.api.routes import chart, market, backtest
+from app.api.routes import chart, market, backtest, trading
 from app.api.websocket import ConnectionManager
 from app.utils.logger import setup_logger
+from app.database.trading_db import initialize_trading_database
 
 # Setup
 config = get_config()
@@ -40,6 +41,7 @@ manager = ConnectionManager()
 app.include_router(chart.router, prefix=f"{config.API_PREFIX}/chart", tags=["chart"])
 app.include_router(market.router, prefix=f"{config.API_PREFIX}/market", tags=["market"])
 app.include_router(backtest.router, prefix=f"{config.API_PREFIX}/backtest", tags=["backtest"])
+app.include_router(trading.router, prefix=f"{config.API_PREFIX}/trading", tags=["trading"])
 
 
 @app.on_event("startup")
@@ -49,6 +51,13 @@ async def startup_event():
     logger.info(f"Available data sources: {config.AVAILABLE_SOURCES}")
     logger.info(f"Max indicators: {config.MAX_INDICATORS or 'Unlimited'}")
     logger.info(f"Historical days: {config.HISTORICAL_DAYS}")
+    
+    # Initialize trading database
+    try:
+        await initialize_trading_database()
+        logger.info("Trading database initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize trading database: {e}")
 
 
 @app.on_event("shutdown")
