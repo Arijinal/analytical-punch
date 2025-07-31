@@ -15,11 +15,7 @@ const Indicators = ({ chart, indicators, selectedIndicators }) => {
       try {
         // Check if series is valid and chart still exists
         if (series && chart && typeof chart.removeSeries === 'function') {
-          // Additional check to see if series is still attached to the chart
-          const allSeries = chart.getAllSeries ? chart.getAllSeries() : [];
-          if (allSeries.includes(series)) {
-            chart.removeSeries(series);
-          }
+          chart.removeSeries(series);
         }
       } catch (error) {
         // Silently ignore - series was already removed
@@ -43,7 +39,7 @@ const Indicators = ({ chart, indicators, selectedIndicators }) => {
         case 'sma':
         case 'ema':
           // Add moving averages
-          if (indicatorData.values) {
+          if (indicatorData.values && indicatorData.timestamps) {
             const series = chart.addLineSeries({
               color: indicatorName === 'sma' ? '#ffaa00' : '#00d4ff',
               lineWidth: 2,
@@ -56,10 +52,12 @@ const Indicators = ({ chart, indicators, selectedIndicators }) => {
                 time: indicatorData.timestamps[index],
                 value: value
               }))
-              .filter(d => d.value !== null);
-
-            series.setData(formattedData);
-            indicatorSeriesRef.current[`${indicatorName}_primary`] = series;
+              .filter(d => d.value !== null && d.value !== undefined);
+            
+            if (formattedData.length > 0) {
+              series.setData(formattedData);
+              indicatorSeriesRef.current[`${indicatorName}_primary`] = series;
+            }
           }
 
           // Add additional series (other periods)
@@ -247,10 +245,7 @@ const Indicators = ({ chart, indicators, selectedIndicators }) => {
       Object.entries(currentSeries).forEach(([key, series]) => {
         try {
           if (series && currentChart && typeof currentChart.removeSeries === 'function') {
-            const allSeries = currentChart.getAllSeries ? currentChart.getAllSeries() : [];
-            if (allSeries.includes(series)) {
-              currentChart.removeSeries(series);
-            }
+            currentChart.removeSeries(series);
           }
         } catch (e) {
           // Silently ignore - chart might be disposed

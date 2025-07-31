@@ -9,6 +9,7 @@ const ChartContainer = () => {
   const chartRef = useRef(null);
   const candlestickSeriesRef = useRef(null);
   const volumeSeriesRef = useRef(null);
+  const [chartInstance, setChartInstance] = React.useState(null);
   
   const { 
     chartData, 
@@ -90,6 +91,7 @@ const ChartContainer = () => {
     chartRef.current = chart;
     candlestickSeriesRef.current = candlestickSeries;
     volumeSeriesRef.current = volumeSeries;
+    setChartInstance(chart);
 
     // Handle resize
     const handleResize = () => {
@@ -119,9 +121,6 @@ const ChartContainer = () => {
   // Update chart data
   useEffect(() => {
     if (!candlestickSeriesRef.current || !volumeSeriesRef.current || !chartData) return;
-
-    console.log('Chart data received:', chartData);
-    console.log('First candle:', chartData[0]);
 
     // Validate and format data for lightweight charts
     const validCandles = chartData.filter(candle => {
@@ -247,9 +246,9 @@ const ChartContainer = () => {
         <div ref={chartContainerRef} className="chart-canvas" />
         
         {/* Overlay indicators */}
-        {chartRef.current && (
+        {chartInstance && indicators && (
           <Indicators 
-            chart={chartRef.current}
+            chart={chartInstance}
             indicators={indicators}
             selectedIndicators={selectedIndicators}
           />

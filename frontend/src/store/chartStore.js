@@ -73,8 +73,8 @@ const useChartStore = create((set, get) => ({
       
       set({
         chartData: response.candles,
-        indicators: response.indicators,
-        signals: response.signals,
+        indicators: response.indicators || {},
+        signals: response.signals || [],
         marketInfo: response.market_info,
         isLoading: false,
         error: null
