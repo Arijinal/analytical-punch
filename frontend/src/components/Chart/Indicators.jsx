@@ -2,15 +2,37 @@ import React, { useEffect, useRef } from 'react';
 
 const Indicators = ({ chart, indicators, selectedIndicators }) => {
   const indicatorSeriesRef = useRef({});
+  const chartInstanceRef = useRef(null);
 
   useEffect(() => {
     if (!chart || !indicators) return;
+    
+    // Store the current chart instance
+    chartInstanceRef.current = chart;
+
+    // Function to safely remove a series
+    const safeRemoveSeries = (seriesKey, series) => {
+      try {
+        // Check if series is valid and chart still exists
+        if (series && chart && typeof chart.removeSeries === 'function') {
+          // Additional check to see if series is still attached to the chart
+          const allSeries = chart.getAllSeries ? chart.getAllSeries() : [];
+          if (allSeries.includes(series)) {
+            chart.removeSeries(series);
+          }
+        }
+      } catch (error) {
+        // Silently ignore - series was already removed
+      }
+    };
 
     // Clear existing indicator series
-    Object.values(indicatorSeriesRef.current).forEach(series => {
-      chart.removeSeries(series);
-    });
+    const currentSeries = { ...indicatorSeriesRef.current };
     indicatorSeriesRef.current = {};
+    
+    Object.entries(currentSeries).forEach(([key, series]) => {
+      safeRemoveSeries(key, series);
+    });
 
     // Add selected indicators
     selectedIndicators.forEach(indicatorName => {
@@ -214,11 +236,24 @@ const Indicators = ({ chart, indicators, selectedIndicators }) => {
 
     return () => {
       // Cleanup on unmount
-      Object.values(indicatorSeriesRef.current).forEach(series => {
+      const currentChart = chartInstanceRef.current;
+      const currentSeries = { ...indicatorSeriesRef.current };
+      
+      // Clear the ref immediately to prevent double cleanup
+      indicatorSeriesRef.current = {};
+      chartInstanceRef.current = null;
+      
+      // Remove all series
+      Object.entries(currentSeries).forEach(([key, series]) => {
         try {
-          chart.removeSeries(series);
+          if (series && currentChart && typeof currentChart.removeSeries === 'function') {
+            const allSeries = currentChart.getAllSeries ? currentChart.getAllSeries() : [];
+            if (allSeries.includes(series)) {
+              currentChart.removeSeries(series);
+            }
+          }
         } catch (e) {
-          // Series might already be removed
+          // Silently ignore - chart might be disposed
         }
       });
     };

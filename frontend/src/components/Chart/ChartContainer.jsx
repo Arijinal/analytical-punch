@@ -106,7 +106,13 @@ const ChartContainer = () => {
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      chart.remove();
+      if (chart) {
+        try {
+          chart.remove();
+        } catch (error) {
+          console.debug('Chart already removed or disposed');
+        }
+      }
     };
   }, []);
 
