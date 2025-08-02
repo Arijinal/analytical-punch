@@ -179,8 +179,8 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
             
             logger.info(f"Started adaptive bot {self.name} with {len(self.strategies)} strategies")
             
-            # Start main trading loop
-            await self._main_loop()
+            # Start main trading loop in the background
+            asyncio.create_task(self._main_loop())
             
         except Exception as e:
             logger.error(f"Error starting bot {self.name}: {e}")
@@ -292,6 +292,10 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
         for symbol in self.symbols:
             for timeframe in self.timeframes:
                 try:
+                    # Initialize data manager if needed
+                    if not hasattr(data_manager, '_initialized') or not data_manager._initialized:
+                        await data_manager.initialize()
+                    
                     # Fetch market data
                     df = await data_manager.fetch_ohlcv(
                         symbol=symbol,

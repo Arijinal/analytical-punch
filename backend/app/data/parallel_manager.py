@@ -21,6 +21,9 @@ class ParallelDataManager(DataManager):
     def __init__(self):
         super().__init__()
         self.executor = ThreadPoolExecutor(max_workers=5)
+        # Ensure the initialized attribute exists
+        if not hasattr(self, '_initialized'):
+            self._initialized = False
     
     async def fetch_ohlcv_parallel(
         self,

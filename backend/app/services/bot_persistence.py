@@ -168,6 +168,10 @@ class BotPersistenceService:
                     for pos in positions
                 ]
                 
+                # Detach positions from session to avoid binding issues
+                for pos in positions:
+                    session.expunge(pos)
+                
                 logger.info(f"Successfully restored state for bot {bot_id}")
                 return bot_state
                 
@@ -181,7 +185,8 @@ class BotPersistenceService:
             with trading_db.get_session() as session:
                 bots = session.query(TradingBot).all()
                 
-                return [
+                # Convert to list of dictionaries to avoid session binding issues
+                result = [
                     {
                         'bot_id': bot.id,
                         'name': bot.name,
@@ -194,6 +199,12 @@ class BotPersistenceService:
                     }
                     for bot in bots
                 ]
+                
+                # Detach bots from session to avoid binding issues
+                for bot in bots:
+                    session.expunge(bot)
+                
+                return result
                 
         except Exception as e:
             logger.error(f"Error listing saved bots: {e}")

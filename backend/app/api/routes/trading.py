@@ -30,6 +30,24 @@ paper_engine = PaperTradingEngine(BinanceExchange(paper_trading=True))
 safety_manager = SafetyManager()
 
 
+def get_bot_status(bot_id: str) -> str:
+    """Safely get bot status from active bots or database"""
+    if bot_id in active_bots:
+        return active_bots[bot_id].status.value
+    
+    # Fallback to database
+    bot = bot_repository.get_bot(bot_id)
+    if bot:
+        return bot['status'].value if hasattr(bot['status'], 'value') else bot['status']
+    
+    return 'unknown'
+
+
+def is_bot_running(bot_id: str) -> bool:
+    """Check if bot is currently running"""
+    return get_bot_status(bot_id) == 'running'
+
+
 # Pydantic models
 class BotConfig(BaseModel):
     name: str = Field(..., description="Bot name")
@@ -224,18 +242,18 @@ async def get_bot(bot_id: str):
         performance = bot_repository.get_bot_performance(bot_id)
         
         result = {
-            'bot_id': bot.id,
-            'name': bot.name,
-            'description': bot.description,
-            'status': bot.status.value,
-            'config': bot.config,
-            'strategies': bot.strategies,
-            'symbols': bot.symbols,
-            'timeframes': bot.timeframes,
-            'paper_trading': bot.paper_trading,
+            'bot_id': bot['id'],
+            'name': bot['name'],
+            'description': bot['description'],
+            'status': bot['status'].value if hasattr(bot['status'], 'value') else bot['status'],
+            'config': bot['config'],
+            'strategies': bot['strategies'],
+            'symbols': bot['symbols'],
+            'timeframes': bot['timeframes'],
+            'paper_trading': bot['paper_trading'],
             'performance': performance,
-            'created_at': bot.created_at.isoformat(),
-            'updated_at': bot.updated_at.isoformat()
+            'created_at': bot['created_at'].isoformat() if bot['created_at'] else None,
+            'updated_at': bot['updated_at'].isoformat() if bot['updated_at'] else None
         }
         
         # Add live data if bot is active
@@ -260,7 +278,7 @@ async def update_bot(bot_id: str, updates: BotUpdate):
             raise HTTPException(status_code=404, detail="Bot not found")
         
         # Check if bot is running
-        if bot_id in active_bots and active_bots[bot_id].status.value == 'running':
+        if is_bot_running(bot_id):
             raise HTTPException(status_code=400, detail="Cannot update running bot")
         
         # Update database
@@ -272,7 +290,7 @@ async def update_bot(bot_id: str, updates: BotUpdate):
             level='INFO',
             component='api',
             event='bot_updated',
-            message=f"Updated bot {bot.name}",
+            message=f"Updated bot {bot['name']}",
             bot_id=bot_id,
             data=update_data
         )
@@ -308,7 +326,7 @@ async def delete_bot(bot_id: str):
             level='INFO',
             component='api',
             event='bot_deleted',
-            message=f"Deleted bot {bot.name}",
+            message=f"Deleted bot {bot['name']}",
             bot_id=bot_id
         )
         
@@ -319,6 +337,48 @@ async def delete_bot(bot_id: str):
     except Exception as e:
         logger.error(f"Error deleting bot {bot_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _start_bot_with_error_handling(bot_id: str, bot_instance):
+    """Wrapper function to handle bot startup with proper error handling"""
+    try:
+        logger.info(f"Starting bot {bot_id} in background task...")
+        
+        # Set status to starting
+        bot_repository.update_bot(bot_id, {
+            'status': 'starting',
+            'started_at': datetime.utcnow()
+        })
+        
+        # Start the bot
+        await bot_instance.start()
+        
+        # If we get here, the bot started successfully
+        # Update database status to running
+        bot_repository.update_bot(bot_id, {
+            'status': 'running'
+        })
+        
+        logger.info(f"Bot {bot_id} started successfully and is now running")
+        
+    except Exception as e:
+        logger.error(f"Bot {bot_id} failed to start: {e}")
+        
+        # Update database status to error
+        bot_repository.update_bot(bot_id, {
+            'status': 'error',
+            'stopped_at': datetime.utcnow()
+        })
+        
+        # Log the error
+        log_repository.log_event(
+            level='ERROR',
+            component='bot_startup',
+            event='bot_start_failed',
+            message=f"Bot {bot_id} failed to start: {str(e)}",
+            bot_id=bot_id,
+            data={'error': str(e)}
+        )
 
 
 @router.post("/bots/{bot_id}/start")
@@ -332,21 +392,19 @@ async def start_bot(bot_id: str, background_tasks: BackgroundTasks):
         if bot_id in active_bots:
             bot_instance = active_bots[bot_id]
             
-            # Start bot in background
-            background_tasks.add_task(bot_instance.start)
+            # Check if bot is already running
+            if bot_instance.status.value == 'running':
+                return {'message': 'Bot is already running', 'bot_id': bot_id}
             
-            # Update database
-            bot_repository.update_bot(bot_id, {
-                'status': 'running',
-                'started_at': datetime.utcnow()
-            })
+            # Start bot with error handling in background
+            background_tasks.add_task(_start_bot_with_error_handling, bot_id, bot_instance)
             
-            # Log start
+            # Log start initiation
             log_repository.log_event(
                 level='INFO',
                 component='api',
-                event='bot_started',
-                message=f"Started bot {bot.name}",
+                event='bot_start_initiated',
+                message=f"Bot start initiated for {bot['name']}",
                 bot_id=bot_id
             )
             
@@ -384,7 +442,7 @@ async def stop_bot(bot_id: str):
                 level='INFO',
                 component='api',
                 event='bot_stopped',
-                message=f"Stopped bot {bot.name}",
+                message=f"Stopped bot {bot['name']}",
                 bot_id=bot_id
             )
             

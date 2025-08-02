@@ -141,10 +141,36 @@ class TradingBotRepository:
                 'updated_at': bot.updated_at
             }
     
-    def get_bot(self, bot_id: str) -> Optional[TradingBot]:
-        """Get trading bot by ID"""
+    def get_bot(self, bot_id: str) -> Optional[Dict[str, Any]]:
+        """Get trading bot by ID as dictionary to avoid session binding issues"""
         with self.db.get_session() as session:
-            return session.query(TradingBot).filter(TradingBot.id == bot_id).first()
+            bot = session.query(TradingBot).filter(TradingBot.id == bot_id).first()
+            if not bot:
+                return None
+            
+            # Convert to dictionary to avoid session issues
+            return {
+                'id': bot.id,
+                'name': bot.name,
+                'description': bot.description,
+                'status': bot.status,
+                'config': bot.config,
+                'strategies': bot.strategies,
+                'symbols': bot.symbols,
+                'timeframes': bot.timeframes,
+                'paper_trading': bot.paper_trading,
+                'initial_capital': bot.initial_capital,
+                'current_capital': bot.current_capital,
+                'total_pnl': bot.total_pnl,
+                'total_return_pct': bot.total_return_pct,
+                'max_drawdown': bot.max_drawdown,
+                'total_trades': bot.total_trades,
+                'win_rate': bot.win_rate,
+                'created_at': bot.created_at,
+                'updated_at': bot.updated_at,
+                'started_at': bot.started_at,
+                'stopped_at': bot.stopped_at
+            }
     
     def get_all_bots(self, active_only: bool = False) -> List[Dict[str, Any]]:
         """Get all trading bots"""
@@ -224,7 +250,7 @@ class TradingBotRepository:
             return {
                 'bot_id': bot_id,
                 'name': bot.name,
-                'status': bot.status.value,
+                'status': bot.status.value if hasattr(bot.status, 'value') else bot.status,
                 'initial_capital': bot.initial_capital,
                 'current_capital': bot.current_capital,
                 'total_pnl': total_pnl,
@@ -259,7 +285,11 @@ class OrderRepository:
     def get_order(self, order_id: str) -> Optional[Order]:
         """Get order by ID"""
         with self.db.get_session() as session:
-            return session.query(Order).filter(Order.id == order_id).first()
+            order = session.query(Order).filter(Order.id == order_id).first()
+            if order:
+                # Detach the object from session to avoid binding issues
+                session.expunge(order)
+            return order
     
     def get_bot_orders(
         self, 
@@ -277,7 +307,13 @@ class OrderRepository:
                     OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED
                 ]))
             
-            return query.order_by(Order.created_at.desc()).limit(limit).all()
+            orders = query.order_by(Order.created_at.desc()).limit(limit).all()
+            
+            # Detach objects from session to avoid binding issues
+            for order in orders:
+                session.expunge(order)
+            
+            return orders
     
     def update_order(self, order_id: str, updates: Dict[str, Any]) -> bool:
         """Update order"""
@@ -312,7 +348,11 @@ class TradeRepository:
     def get_trade(self, trade_id: str) -> Optional[Trade]:
         """Get trade by ID"""
         with self.db.get_session() as session:
-            return session.query(Trade).filter(Trade.id == trade_id).first()
+            trade = session.query(Trade).filter(Trade.id == trade_id).first()
+            if trade:
+                # Detach the object from session to avoid binding issues
+                session.expunge(trade)
+            return trade
     
     def get_bot_trades(
         self, 
@@ -327,7 +367,13 @@ class TradeRepository:
             if strategy:
                 query = query.filter(Trade.strategy == strategy)
             
-            return query.order_by(Trade.exit_time.desc()).limit(limit).all()
+            trades = query.order_by(Trade.exit_time.desc()).limit(limit).all()
+            
+            # Detach objects from session to avoid binding issues
+            for trade in trades:
+                session.expunge(trade)
+            
+            return trades
     
     def get_strategy_performance(
         self, 
@@ -408,12 +454,22 @@ class PositionRepository:
     def get_position(self, position_id: str) -> Optional[Position]:
         """Get position by ID"""
         with self.db.get_session() as session:
-            return session.query(Position).filter(Position.id == position_id).first()
+            position = session.query(Position).filter(Position.id == position_id).first()
+            if position:
+                # Detach the object from session to avoid binding issues
+                session.expunge(position)
+            return position
     
     def get_bot_positions(self, bot_id: str) -> List[Position]:
         """Get all positions for a bot"""
         with self.db.get_session() as session:
-            return session.query(Position).filter(Position.bot_id == bot_id).all()
+            positions = session.query(Position).filter(Position.bot_id == bot_id).all()
+            
+            # Detach objects from session to avoid binding issues
+            for position in positions:
+                session.expunge(position)
+            
+            return positions
     
     def get_position_by_symbol(self, bot_id: str, symbol: str) -> Optional[Position]:
         """Get position by bot and symbol"""
@@ -472,7 +528,13 @@ class AlertRepository:
             if unacknowledged_only:
                 query = query.filter(SafetyAlert.acknowledged == False)
             
-            return query.order_by(SafetyAlert.timestamp.desc()).limit(limit).all()
+            alerts = query.order_by(SafetyAlert.timestamp.desc()).limit(limit).all()
+            
+            # Detach objects from session to avoid binding issues
+            for alert in alerts:
+                session.expunge(alert)
+            
+            return alerts
     
     def acknowledge_alert(self, alert_id: str, acknowledged_by: str) -> bool:
         """Acknowledge an alert"""
