@@ -148,6 +148,11 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
             return
         
         try:
+            # Try to restore previous state
+            restored = await self.restore_state()
+            if restored:
+                logger.info(f"Restored previous state for bot {self.name}")
+            
             # Connect to exchange
             if not await self.exchange.connect():
                 raise Exception("Failed to connect to exchange")
@@ -177,6 +182,10 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
         self._running = False
         self.status = BotStatus.STOPPED
         
+        # Save final state
+        await self.save_state()
+        logger.info(f"Saved final state for bot {self.name}")
+        
         # Close all open positions
         await self._close_all_positions("Bot stopped")
         
@@ -198,6 +207,9 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
     
     async def _main_loop(self):
         """Main trading loop"""
+        last_save_time = datetime.utcnow()
+        save_interval = 300  # Save state every 5 minutes
+        
         while self._running:
             try:
                 current_time = datetime.utcnow()
@@ -217,12 +229,25 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
                 # Update performance metrics
                 await self._update_performance_metrics()
                 
+                # Save state periodically
+                if (current_time - last_save_time).total_seconds() >= save_interval:
+                    await self.save_state()
+                    last_save_time = current_time
+                    logger.info(f"Bot state saved for {self.bot_id}")
+                
                 # Sleep until next update
                 await asyncio.sleep(self.update_interval)
                 
             except Exception as e:
                 logger.error(f"Error in main loop: {e}")
                 await self._emit_error(f"Main loop error: {e}")
+                
+                # Try to save state on error
+                try:
+                    await self.save_state()
+                except:
+                    pass
+                
                 await asyncio.sleep(60)  # Wait before retrying
     
     async def _update_portfolio(self):

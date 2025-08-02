@@ -6,6 +6,7 @@ import TradeRecommendations from './components/Signals/TradeRecommendations';
 import TickerSelector from './components/Controls/TickerSelector';
 import TimeframeSelector from './components/Controls/TimeframeSelector';
 import BacktestDashboard from './components/Backtest/BacktestDashboard';
+import TradingDashboard from './components/Trading/TradingDashboard';
 import useWebSocket from './hooks/useWebSocket';
 import { useChartStore } from './store/chartStore';
 import './App.css';
@@ -72,6 +73,12 @@ function App() {
         >
           Backtest
         </button>
+        <button 
+          className={`nav-tab ${activeTab === 'trading' ? 'active' : ''}`}
+          onClick={() => setActiveTab('trading')}
+        >
+          Trading Bots
+        </button>
       </nav>
 
       {/* Main Content */}
@@ -122,6 +129,13 @@ function App() {
           {activeTab === 'backtest' && (
             <div className="backtest-section">
               <BacktestDashboard />
+            </div>
+          )}
+
+          {/* Trading Bots Tab */}
+          {activeTab === 'trading' && (
+            <div className="trading-section">
+              <TradingDashboard />
             </div>
           )}
         </div>

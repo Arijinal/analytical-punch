@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from app.data.manager import data_manager
+from app.data.parallel_manager import parallel_data_manager
 from app.core.indicators.base import IndicatorManager
 from app.core.signals.generator import SignalGenerator
 from app.core.analysis.market_info import MarketAnalyzer
@@ -23,6 +24,7 @@ market_analyzer = MarketAnalyzer()
 
 
 @router.get("/{symbol}")
+@cached(prefix="chart", ttl=60)  # Cache for 1 minute for real-time feel
 async def get_chart_data(
     symbol: str,
     interval: str = Query("1h", description="Timeframe: 1m, 5m, 15m, 30m, 1h, 4h, 1d, 1w"),
@@ -50,8 +52,8 @@ async def get_chart_data(
         if end_date:
             end_time = datetime.strptime(end_date, "%Y-%m-%d")
         
-        # Fetch OHLCV data
-        ohlcv_df = await data_manager.fetch_ohlcv(
+        # Fetch OHLCV data using parallel manager for faster loading
+        ohlcv_df = await parallel_data_manager.fetch_ohlcv_parallel(
             symbol=symbol,
             timeframe=interval,
             start_time=start_time,

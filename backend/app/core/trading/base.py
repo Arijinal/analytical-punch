@@ -11,6 +11,8 @@ from enum import Enum
 import pandas as pd
 import numpy as np
 
+from app.services.bot_persistence import bot_persistence
+
 
 class OrderType(Enum):
     """Order types"""
@@ -405,6 +407,135 @@ class TradingBot(ABC):
             'profit_factor': self.profit_factor,
             'max_drawdown': self.max_drawdown
         }
+    
+    async def save_state(self) -> bool:
+        """Save bot state to persistent storage"""
+        try:
+            # Prepare bot state
+            bot_state = {
+                'bot_id': self.bot_id,
+                'name': self.name,
+                'status': self.status.value,
+                'paper_trading': self.paper_trading,
+                'config': self.config,
+                'strategies': [s.name for s in self.strategies],
+                
+                # Portfolio state
+                'portfolio': {
+                    'cash': self.portfolio.cash,
+                    'total_value': self.portfolio.total_value,
+                    'unrealized_pnl': self.portfolio.unrealized_pnl,
+                    'realized_pnl': self.portfolio.realized_pnl,
+                    'positions': {
+                        symbol: {
+                            'side': pos.side,
+                            'size': pos.size,
+                            'entry_price': pos.entry_price,
+                            'current_price': pos.current_price,
+                            'entry_time': pos.entry_time.isoformat(),
+                            'unrealized_pnl': pos.unrealized_pnl,
+                            'stop_loss': pos.stop_loss,
+                            'take_profit': pos.take_profit
+                        }
+                        for symbol, pos in self.portfolio.positions.items()
+                    }
+                },
+                
+                # Performance metrics
+                'trades_today': self.trades_today,
+                'total_trades': self.total_trades,
+                'win_rate': self.win_rate,
+                'profit_factor': self.profit_factor,
+                'max_drawdown': self.max_drawdown,
+                
+                # Timestamp
+                'saved_at': datetime.utcnow().isoformat()
+            }
+            
+            # Save to persistence service
+            return await bot_persistence.save_bot_state(self.bot_id, bot_state)
+            
+        except Exception as e:
+            await self._emit_error(f"Failed to save bot state: {e}")
+            return False
+    
+    async def restore_state(self) -> bool:
+        """Restore bot state from persistent storage"""
+        try:
+            # Load state from persistence service
+            state = await bot_persistence.restore_bot_state(self.bot_id)
+            
+            if not state:
+                return False
+            
+            # Restore basic attributes
+            self.name = state.get('name', self.name)
+            self.status = BotStatus(state.get('status', 'stopped'))
+            self.paper_trading = state.get('paper_trading', True)
+            
+            # Restore portfolio
+            if 'portfolio' in state:
+                portfolio_state = state['portfolio']
+                self.portfolio.cash = portfolio_state.get('cash', 10000)
+                self.portfolio.total_value = portfolio_state.get('total_value', 10000)
+                self.portfolio.unrealized_pnl = portfolio_state.get('unrealized_pnl', 0)
+                self.portfolio.realized_pnl = portfolio_state.get('realized_pnl', 0)
+                
+                # Restore positions
+                self.portfolio.positions.clear()
+                for symbol, pos_data in portfolio_state.get('positions', {}).items():
+                    position = Position(
+                        symbol=symbol,
+                        side=pos_data['side'],
+                        size=pos_data['size'],
+                        entry_price=pos_data['entry_price'],
+                        current_price=pos_data['current_price'],
+                        entry_time=datetime.fromisoformat(pos_data['entry_time']),
+                        unrealized_pnl=pos_data.get('unrealized_pnl', 0),
+                        stop_loss=pos_data.get('stop_loss'),
+                        take_profit=pos_data.get('take_profit')
+                    )
+                    self.portfolio.positions[symbol] = position
+            
+            # Restore performance metrics
+            self.trades_today = state.get('trades_today', 0)
+            self.total_trades = state.get('total_trades', 0)
+            self.win_rate = state.get('win_rate', 0.0)
+            self.profit_factor = state.get('profit_factor', 0.0)
+            self.max_drawdown = state.get('max_drawdown', 0.0)
+            
+            await self._emit_signal(Signal(
+                symbol='SYSTEM',
+                direction='info',
+                confidence=1.0,
+                timestamp=datetime.utcnow(),
+                strategy='system',
+                indicators={'message': f'Bot state restored from {state.get("saved_at", "unknown")}'}
+            ))
+            
+            return True
+            
+        except Exception as e:
+            await self._emit_error(f"Failed to restore bot state: {e}")
+            return False
+    
+    async def checkpoint(self) -> bool:
+        """Create a checkpoint of current bot state"""
+        try:
+            checkpoint_data = {
+                'portfolio_value': self.portfolio.total_value,
+                'positions': len(self.portfolio.positions),
+                'unrealized_pnl': self.portfolio.unrealized_pnl,
+                'realized_pnl': self.portfolio.realized_pnl,
+                'win_rate': self.win_rate,
+                'total_trades': self.total_trades
+            }
+            
+            return await bot_persistence.save_checkpoint(self.bot_id, checkpoint_data)
+            
+        except Exception as e:
+            await self._emit_error(f"Failed to create checkpoint: {e}")
+            return False
 
 
 class MultiStrategyBot(TradingBot):

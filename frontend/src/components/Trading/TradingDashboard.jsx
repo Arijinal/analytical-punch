@@ -5,6 +5,7 @@ import BotDetails from './BotDetails';
 import BotCreator from './BotCreator';
 import SystemMonitor from './SystemMonitor';
 import AlertCenter from './AlertCenter';
+import api from '../../services/api';
 
 const TradingDashboard = () => {
   const [activeTab, setActiveTab] = useState('bots');
@@ -23,18 +24,15 @@ const TradingDashboard = () => {
   const loadDashboardData = async () => {
     try {
       // Load bots
-      const botsResponse = await fetch('/api/v1/trading/bots');
-      const botsData = await botsResponse.json();
-      setBots(botsData);
+      const botsData = await api.getBots();
+      setBots(botsData.bots || []);
 
       // Load system status
-      const statusResponse = await fetch('/api/v1/trading/system/status');
-      const statusData = await statusResponse.json();
+      const statusData = await api.getSystemStatus();
       setSystemStatus(statusData);
 
       // Load alerts
-      const alertsResponse = await fetch('/api/v1/trading/alerts?unacknowledged_only=true&limit=20');
-      const alertsData = await alertsResponse.json();
+      const alertsData = await api.getAlerts(null, null, true, 20);
       setAlerts(alertsData);
 
       setLoading(false);
@@ -51,45 +49,44 @@ const TradingDashboard = () => {
 
   const handleBotCreate = async (botConfig) => {
     try {
-      const response = await fetch('/api/v1/trading/bots', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(botConfig),
-      });
-
-      if (response.ok) {
-        await loadDashboardData();
-        setActiveTab('bots');
-      } else {
-        throw new Error('Failed to create bot');
-      }
+      await api.createBot(botConfig);
+      await loadDashboardData();
+      setActiveTab('bots');
     } catch (error) {
       console.error('Error creating bot:', error);
-      alert('Failed to create bot');
+      alert('Failed to create bot: ' + error.message);
     }
   };
 
   const handleBotAction = async (botId, action) => {
     try {
-      const response = await fetch(`/api/v1/trading/bots/${botId}/${action}`, {
-        method: 'POST',
-      });
+      // Call the appropriate API method based on action
+      switch (action) {
+        case 'start':
+          await api.startBot(botId);
+          break;
+        case 'stop':
+          await api.stopBot(botId);
+          break;
+        case 'pause':
+          await api.pauseBot(botId);
+          break;
+        case 'resume':
+          await api.resumeBot(botId);
+          break;
+        default:
+          throw new Error(`Unknown action: ${action}`);
+      }
 
-      if (response.ok) {
-        await loadDashboardData();
-        // Update selected bot if it's the one being acted upon
-        if (selectedBot && selectedBot.bot_id === botId) {
-          const updatedBot = bots.find(bot => bot.bot_id === botId);
-          setSelectedBot(updatedBot);
-        }
-      } else {
-        throw new Error(`Failed to ${action} bot`);
+      await loadDashboardData();
+      // Update selected bot if it's the one being acted upon
+      if (selectedBot && selectedBot.bot_id === botId) {
+        const updatedBot = bots.find(bot => bot.bot_id === botId);
+        setSelectedBot(updatedBot);
       }
     } catch (error) {
       console.error(`Error ${action} bot:`, error);
-      alert(`Failed to ${action} bot`);
+      alert(`Failed to ${action} bot: ${error.message}`);
     }
   };
 

@@ -9,6 +9,7 @@ import logging
 from app.config import get_config
 from app.api.routes import chart, market, backtest, trading
 from app.api.websocket import ConnectionManager
+from app.services.realtime_updater import RealTimeUpdater
 from app.utils.logger import setup_logger
 from app.database.trading_db import initialize_trading_database
 
@@ -37,6 +38,9 @@ app.add_middleware(
 # WebSocket connection manager
 manager = ConnectionManager()
 
+# Real-time price updater
+realtime_updater = RealTimeUpdater(manager)
+
 # Include routers
 app.include_router(chart.router, prefix=f"{config.API_PREFIX}/chart", tags=["chart"])
 app.include_router(market.router, prefix=f"{config.API_PREFIX}/market", tags=["market"])
@@ -58,12 +62,17 @@ async def startup_event():
         logger.info("Trading database initialized successfully")
     except Exception as e:
         logger.error(f"Failed to initialize trading database: {e}")
+    
+    # Start real-time update subscription checker
+    asyncio.create_task(realtime_updater.check_subscriptions())
+    logger.info("Real-time price updater started")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
     logger.info("Shutting down Analytical Punch")
+    await realtime_updater.shutdown()
     await manager.disconnect_all()
 
 

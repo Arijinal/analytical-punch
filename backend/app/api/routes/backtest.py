@@ -88,7 +88,9 @@ async def run_backtest(request: BacktestRequest) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
+        import traceback
         logger.error(f"Error running backtest: {e}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

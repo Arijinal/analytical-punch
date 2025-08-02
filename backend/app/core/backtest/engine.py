@@ -82,7 +82,11 @@ class Portfolio:
             if trade.direction == 'long':
                 position_value += trade.size * current_price
             else:  # short
-                position_value += trade.size * (2 * trade.entry_price - current_price)
+                # Ensure current_price is not None
+                if current_price is not None:
+                    position_value += trade.size * (2 * trade.entry_price - current_price)
+                else:
+                    position_value += trade.size * trade.entry_price
         
         total_equity = self.cash + position_value
         self.equity_curve.append(total_equity)
@@ -163,6 +167,7 @@ class BacktestEngine:
                     if signals:
                         signal = signals[0]  # Take highest confidence signal
                         all_signals.append(signal)
+                        logger.info(f"Signal generated at {current_time}: {signal.direction} with confidence {signal.confidence}")
                         
                         # Execute trade
                         self._execute_trade(
@@ -184,6 +189,9 @@ class BacktestEngine:
             metrics = self.metrics_calculator.calculate(
                 portfolio, initial_capital
             )
+            
+            # Log summary
+            logger.info(f"Backtest completed: {len(portfolio.closed_trades)} trades executed, {len(all_signals)} signals generated")
             
             # Prepare results
             results = {
@@ -210,7 +218,8 @@ class BacktestEngine:
                     "values": portfolio.equity_curve
                 },
                 "signals_generated": len(all_signals),
-                "data_points": len(df)
+                "data_points": len(df),
+                "message": self._get_backtest_message(len(portfolio.closed_trades), len(all_signals), len(df))
             }
             
             # Cache results
@@ -220,6 +229,8 @@ class BacktestEngine:
             
         except Exception as e:
             logger.error(f"Backtest error: {e}")
+            import traceback
+            logger.error(f"Full traceback: {traceback.format_exc()}")
             raise
     
     def _update_positions(
@@ -234,6 +245,12 @@ class BacktestEngine:
         if symbol not in portfolio.positions:
             return
         
+        # Validate parameters
+        if commission is None:
+            commission = 0.001
+        if slippage is None:
+            slippage = 0.0005
+            
         trade = portfolio.positions[symbol]
         current_price = current_candle['close']
         
@@ -272,9 +289,15 @@ class BacktestEngine:
         slippage: float
     ):
         """Execute a trade based on signal"""
+        # Validate parameters
+        if commission is None:
+            commission = 0.001
+        if slippage is None:
+            slippage = 0.0005
+            
         # Calculate position size
         position_value = portfolio.cash * position_size
-        entry_price = current_candle['close'] * (1 + (slippage if slippage is not None else 0))
+        entry_price = current_candle['close'] * (1 + slippage)
         size = position_value / entry_price
         
         # Calculate commission
@@ -284,6 +307,21 @@ class BacktestEngine:
         if portfolio.cash < position_value + trade_commission:
             return
         
+        # Calculate stop loss and take profit
+        if hasattr(signal, 'stop_loss') and signal.stop_loss is not None:
+            trade_stop_loss = signal.stop_loss
+        elif stop_loss is not None:
+            trade_stop_loss = entry_price * (1 - stop_loss)
+        else:
+            trade_stop_loss = None
+            
+        if hasattr(signal, 'take_profit_levels') and signal.take_profit_levels and len(signal.take_profit_levels) > 0:
+            trade_take_profit = signal.take_profit_levels[0]
+        elif take_profit is not None:
+            trade_take_profit = entry_price * (1 + take_profit)
+        else:
+            trade_take_profit = None
+        
         # Create trade
         trade = Trade(
             id=str(uuid.uuid4()),
@@ -292,11 +330,8 @@ class BacktestEngine:
             entry_price=entry_price,
             entry_time=pd.Timestamp(current_candle.name) if hasattr(current_candle, 'name') else datetime.now(),
             size=size,
-            stop_loss=signal.stop_loss if hasattr(signal, 'stop_loss') else 
-                     (entry_price * (1 - stop_loss) if stop_loss is not None else None),
-            take_profit=(signal.take_profit_levels[0] if hasattr(signal, 'take_profit_levels') and 
-                        signal.take_profit_levels and len(signal.take_profit_levels) > 0 else
-                       (entry_price * (1 + take_profit) if take_profit is not None else None)),
+            stop_loss=trade_stop_loss,
+            take_profit=trade_take_profit,
             commission=trade_commission
         )
         
@@ -317,6 +352,10 @@ class BacktestEngine:
         if symbol not in portfolio.positions:
             return
         
+        # Validate parameters
+        if commission is None:
+            commission = 0.001
+            
         trade = portfolio.positions[symbol]
         trade.exit_price = exit_price
         trade.exit_time = exit_time
@@ -376,6 +415,12 @@ class BacktestEngine:
         reason: str
     ):
         """Close all open positions"""
+        # Validate parameters
+        if commission is None:
+            commission = 0.001
+        if slippage is None:
+            slippage = 0.0005
+            
         for sym in list(portfolio.positions.keys()):
             exit_price = current_candle['close'] * (1 - slippage)
             self._close_position(
@@ -413,6 +458,19 @@ class BacktestEngine:
                     signals.append(MockSignal())
         
         return signals
+    
+    def _get_backtest_message(self, trades_count: int, signals_count: int, data_points: int) -> str:
+        """Generate helpful message about backtest results"""
+        if trades_count == 0:
+            if signals_count == 0:
+                if data_points < 50:
+                    return "No trades executed. Try using a longer date range (at least 30-90 days) for strategies to generate signals."
+                else:
+                    return "No trades executed. The strategy didn't find suitable entry conditions. Try adjusting strategy parameters or using a different time period."
+            else:
+                return f"No trades executed despite {signals_count} signals. Check position sizing and capital allocation."
+        else:
+            return f"Successfully executed {trades_count} trades from {signals_count} signals."
     
     def _trade_to_dict(self, trade: Trade) -> Dict:
         """Convert trade to dictionary"""

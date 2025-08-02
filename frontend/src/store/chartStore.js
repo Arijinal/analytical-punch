@@ -116,18 +116,49 @@ const useChartStore = create((set, get) => ({
     const chartData = get().chartData;
     if (!chartData || chartData.length === 0) return;
     
-    // Update the last candle
-    const updatedData = [...chartData];
-    const lastCandle = { ...updatedData[updatedData.length - 1] };
-    
-    lastCandle.close = priceData.price;
-    lastCandle.high = Math.max(lastCandle.high, priceData.price);
-    lastCandle.low = Math.min(lastCandle.low, priceData.price);
-    lastCandle.volume = priceData.volume || lastCandle.volume;
-    
-    updatedData[updatedData.length - 1] = lastCandle;
-    
-    set({ chartData: updatedData });
+    // Handle the new price data format from real-time updater
+    if (priceData.time) {
+      // Full candle update from real-time service
+      const newCandle = {
+        time: new Date(priceData.time).getTime() / 1000,
+        open: priceData.open,
+        high: priceData.high,
+        low: priceData.low,
+        close: priceData.close,
+        volume: priceData.volume
+      };
+      
+      const updatedData = [...chartData];
+      const lastCandle = updatedData[updatedData.length - 1];
+      const isSameCandle = lastCandle.time === newCandle.time;
+      
+      if (isSameCandle && !priceData.is_complete) {
+        // Update existing incomplete candle
+        updatedData[updatedData.length - 1] = newCandle;
+      } else if (!isSameCandle) {
+        // Add new candle
+        updatedData.push(newCandle);
+        // Keep only last 1000 candles
+        if (updatedData.length > 1000) {
+          updatedData.shift();
+        }
+      }
+      
+      set({ chartData: updatedData, latestPrice: priceData.close });
+    } else {
+      // Legacy price update
+      const updatedData = [...chartData];
+      const lastCandle = { ...updatedData[updatedData.length - 1] };
+      
+      lastCandle.close = priceData.price || priceData.close;
+      lastCandle.high = Math.max(lastCandle.high, lastCandle.close);
+      lastCandle.low = Math.min(lastCandle.low, lastCandle.close);
+      lastCandle.volume = priceData.volume || lastCandle.volume;
+      
+      updatedData[updatedData.length - 1] = lastCandle;
+      
+      set({ chartData: updatedData, latestPrice: lastCandle.close });
+    }
   },
   
   updateIndicator: (symbol, indicatorName, data) => {

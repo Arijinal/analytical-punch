@@ -217,7 +217,8 @@ class CoinbaseDataSource(DataSource):
                 df.index = pd.to_datetime(df.index)
                 
                 # Limit to requested number of candles
-                df = df.tail(limit).copy()
+                if limit is not None:
+                    df = df.tail(limit).copy()
                 
                 return df
                 

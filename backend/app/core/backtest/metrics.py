@@ -14,8 +14,13 @@ class BacktestMetrics:
     def calculate(self, portfolio: Any, initial_capital: float) -> Dict[str, Any]:
         """Calculate all backtest metrics"""
         
-        if not portfolio.closed_trades and not portfolio.equity_curve:
-            return self._empty_metrics()
+        if not portfolio.closed_trades:
+            # No trades were executed, return empty metrics with initial capital info
+            empty_metrics = self._empty_metrics()
+            empty_metrics['final_equity'] = initial_capital
+            empty_metrics['total_return'] = 0
+            empty_metrics['total_return_pct'] = 0
+            return empty_metrics
         
         # Basic metrics
         total_trades = len(portfolio.closed_trades)

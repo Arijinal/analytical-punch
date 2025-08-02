@@ -4,7 +4,7 @@ const BotCreator = ({ onBotCreate }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    symbols: ['BTC/USDT', 'ETH/USDT'],
+    symbols: ['BTC-USD', 'ETH-USD'],
     timeframes: ['1h', '4h'],
     paper_trading: true,
     initial_capital: 10000,
@@ -19,8 +19,8 @@ const BotCreator = ({ onBotCreate }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const popularSymbols = [
-    'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'SOL/USDT',
-    'DOT/USDT', 'LINK/USDT', 'MATIC/USDT', 'AVAX/USDT', 'UNI/USDT'
+    'BTC-USD', 'ETH-USD', 'BNB-USD', 'ADA-USD', 'SOL-USD',
+    'DOT-USD', 'LINK-USD', 'MATIC-USD', 'AVAX-USD', 'UNI-USD'
   ];
 
   const availableTimeframes = [
@@ -240,7 +240,7 @@ const BotCreator = ({ onBotCreate }) => {
                   type="text"
                   value={customSymbol}
                   onChange={(e) => setCustomSymbol(e.target.value)}
-                  placeholder="e.g., DOT/USDT"
+                  placeholder="e.g., DOT-USD"
                   onKeyPress={(e) => e.key === 'Enter' && handleAddCustomSymbol()}
                 />
                 <button type="button" onClick={handleAddCustomSymbol}>

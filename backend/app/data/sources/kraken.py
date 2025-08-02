@@ -205,7 +205,9 @@ class KrakenDataSource(DataSource):
                 
                 # Convert to DataFrame
                 df_data = []
-                for ohlc in pair_data[-limit:]:  # Limit to requested number of candles
+                # Use slicing only if limit is specified
+                data_to_process = pair_data[-limit:] if limit is not None else pair_data
+                for ohlc in data_to_process:
                     timestamp = datetime.fromtimestamp(float(ohlc[0]))
                     df_data.append({
                         'timestamp': timestamp,

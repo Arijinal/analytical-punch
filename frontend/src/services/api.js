@@ -136,6 +136,86 @@ const api = {
     return axiosInstance.post('/backtest/compare', comparisonConfig);
   },
 
+  // Trading Bot endpoints
+  getBots: async (activeOnly = false) => {
+    return axiosInstance.get('/trading/bots', { params: { active_only: activeOnly } });
+  },
+
+  getBot: async (botId) => {
+    return axiosInstance.get(`/trading/bots/${botId}`);
+  },
+
+  createBot: async (botConfig) => {
+    return axiosInstance.post('/trading/bots', botConfig);
+  },
+
+  updateBot: async (botId, updates) => {
+    return axiosInstance.put(`/trading/bots/${botId}`, updates);
+  },
+
+  deleteBot: async (botId) => {
+    return axiosInstance.delete(`/trading/bots/${botId}`);
+  },
+
+  startBot: async (botId) => {
+    return axiosInstance.post(`/trading/bots/${botId}/start`);
+  },
+
+  stopBot: async (botId) => {
+    return axiosInstance.post(`/trading/bots/${botId}/stop`);
+  },
+
+  pauseBot: async (botId) => {
+    return axiosInstance.post(`/trading/bots/${botId}/pause`);
+  },
+
+  resumeBot: async (botId) => {
+    return axiosInstance.post(`/trading/bots/${botId}/resume`);
+  },
+
+  getBotPositions: async (botId) => {
+    return axiosInstance.get(`/trading/bots/${botId}/positions`);
+  },
+
+  getBotTrades: async (botId, limit = 100, strategy = null) => {
+    const params = { limit };
+    if (strategy) params.strategy = strategy;
+    return axiosInstance.get(`/trading/bots/${botId}/trades`, { params });
+  },
+
+  getBotOrders: async (botId, activeOnly = false, limit = 100) => {
+    return axiosInstance.get(`/trading/bots/${botId}/orders`, {
+      params: { active_only: activeOnly, limit }
+    });
+  },
+
+  getBotPerformance: async (botId) => {
+    return axiosInstance.get(`/trading/bots/${botId}/performance`);
+  },
+
+  // Alert endpoints
+  getAlerts: async (botId = null, level = null, unacknowledgedOnly = false, limit = 100) => {
+    const params = { limit, unacknowledged_only: unacknowledgedOnly };
+    if (botId) params.bot_id = botId;
+    if (level) params.level = level;
+    return axiosInstance.get('/trading/alerts', { params });
+  },
+
+  acknowledgeAlert: async (alertId, acknowledgedBy = 'user') => {
+    return axiosInstance.post(`/trading/alerts/${alertId}/acknowledge`, {
+      acknowledged_by: acknowledgedBy
+    });
+  },
+
+  // System endpoints
+  getSystemStatus: async () => {
+    return axiosInstance.get('/trading/system/status');
+  },
+
+  getSafetyStatus: async () => {
+    return axiosInstance.get('/trading/safety/status');
+  },
+
   // Health check
   healthCheck: async () => {
     return axiosInstance.get('/health');
