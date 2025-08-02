@@ -104,11 +104,11 @@ class TrendPunchStrategy(TradingStrategy):
         super().__init__("trend_punch", default_params)
         
         # Initialize indicators
-        self.sma_fast = SMAIndicator(period=self.parameters['sma_fast'])
-        self.sma_medium = SMAIndicator(period=self.parameters['sma_medium'])
-        self.sma_slow = SMAIndicator(period=self.parameters['sma_slow'])
-        self.ema_fast = EMAIndicator(period=self.parameters['ema_fast'])
-        self.ema_slow = EMAIndicator(period=self.parameters['ema_slow'])
+        self.sma_fast = SMAIndicator(periods=[self.parameters['sma_fast']])
+        self.sma_medium = SMAIndicator(periods=[self.parameters['sma_medium']])
+        self.sma_slow = SMAIndicator(periods=[self.parameters['sma_slow']])
+        self.ema_fast = EMAIndicator(periods=[self.parameters['ema_fast']])
+        self.ema_slow = EMAIndicator(periods=[self.parameters['ema_slow']])
         
         self.adx = ADXIndicator(period=self.parameters['adx_period'])
         self.macd = MACDIndicator(

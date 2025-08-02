@@ -105,14 +105,37 @@ async def create_bot(config: BotConfig, background_tasks: BackgroundTasks):
         bot_name = db_bot['name']
         created_at = db_bot['created_at']
         
-        # Create bot instance
-        bot_instance = AdaptiveMultiStrategyBot(
-            bot_id=bot_id,
-            name=bot_name,
-            config=config.dict(),
-            symbols=config.symbols,
-            timeframes=config.timeframes
-        )
+        # Create bot instance with filtered config
+        # Only pass the required parameters to avoid unexpected keyword arguments
+        filtered_config = {
+            'paper_trading': config.paper_trading,
+            'initial_capital': config.initial_capital,
+            'max_position_size': config.max_position_size,
+            'max_daily_loss': config.max_daily_loss,
+            'max_drawdown': config.max_drawdown,
+            'max_open_positions': config.max_open_positions,
+            'update_interval': config.update_interval,
+            'rebalance_interval': config.rebalance_interval,
+            'momentum_params': config.momentum_params,
+            'value_params': config.value_params,
+            'breakout_params': config.breakout_params,
+            'trend_params': config.trend_params
+        }
+        
+        try:
+            bot_instance = AdaptiveMultiStrategyBot(
+                bot_id=bot_id,
+                name=bot_name,
+                config=filtered_config,
+                symbols=config.symbols,
+                timeframes=config.timeframes
+            )
+        except Exception as e:
+            logger.error(f"Error creating AdaptiveMultiStrategyBot: {e}")
+            logger.error(f"Config: {filtered_config}")
+            logger.error(f"Symbols: {config.symbols}")
+            logger.error(f"Timeframes: {config.timeframes}")
+            raise
         
         # Store in active bots
         active_bots[bot_id] = bot_instance

@@ -106,10 +106,10 @@ class ValuePunchStrategy(TradingStrategy):
             d_period=self.parameters['stoch_d_period'],
             smooth=self.parameters['stoch_smooth']
         )
-        self.sma_short = SMAIndicator(period=self.parameters['sma_short'])
-        self.sma_medium = SMAIndicator(period=self.parameters['sma_medium'])
-        self.sma_long = SMAIndicator(period=self.parameters['sma_long'])
-        self.ema = EMAIndicator(period=self.parameters['ema_period'])
+        self.sma_short = SMAIndicator(periods=[self.parameters['sma_short']])
+        self.sma_medium = SMAIndicator(periods=[self.parameters['sma_medium']])
+        self.sma_long = SMAIndicator(periods=[self.parameters['sma_long']])
+        self.ema = EMAIndicator(periods=[self.parameters['ema_period']])
         self.bb = BollingerBandsIndicator(
             period=self.parameters['bb_period'],
             std_dev=self.parameters['bb_std']

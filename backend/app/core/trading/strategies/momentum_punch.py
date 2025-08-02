@@ -91,9 +91,9 @@ class MomentumPunchStrategy(TradingStrategy):
             slow=self.parameters['macd_slow'],
             signal=self.parameters['macd_signal']
         )
-        self.sma_fast = SMAIndicator(period=self.parameters['sma_fast'])
-        self.sma_slow = SMAIndicator(period=self.parameters['sma_slow'])
-        self.ema = EMAIndicator(period=self.parameters['ema_period'])
+        self.sma_fast = SMAIndicator(periods=[self.parameters['sma_fast']])
+        self.sma_slow = SMAIndicator(periods=[self.parameters['sma_slow']])
+        self.ema = EMAIndicator(periods=[self.parameters['ema_period']])
         self.bb = BollingerBandsIndicator(
             period=self.parameters['bb_period'],
             std_dev=self.parameters['bb_std']

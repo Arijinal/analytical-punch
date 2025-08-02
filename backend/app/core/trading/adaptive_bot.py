@@ -77,35 +77,45 @@ class AdaptiveMultiStrategyBot(MultiStrategyBot):
         symbols: List[str],
         timeframes: List[str] = None
     ):
-        # Initialize exchange
-        exchange = BinanceExchange(paper_trading=config.get('paper_trading', True))
-        
-        # Initialize risk manager
-        risk_limits = RiskLimits(
-            max_position_size=config.get('max_position_size', 0.1),
-            max_portfolio_risk=config.get('max_portfolio_risk', 0.02),
-            max_daily_loss=config.get('max_daily_loss', 0.05),
-            max_drawdown=config.get('max_drawdown', 0.15),
-            max_open_positions=config.get('max_open_positions', 5),
-            max_trades_per_day=config.get('max_trades_per_day', 10)
-        )
-        risk_manager = AdvancedRiskManager(risk_limits)
-        
-        # Initialize strategies
-        strategies = [
-            MomentumPunchStrategy(config.get('momentum_params')),
-            ValuePunchStrategy(config.get('value_params')),
-            BreakoutPunchStrategy(config.get('breakout_params')),
-            TrendPunchStrategy(config.get('trend_params'))
-        ]
-        
-        # Initial equal allocation
-        initial_allocation = {strategy.name: 0.25 for strategy in strategies}
-        
-        super().__init__(
-            bot_id, name, exchange, risk_manager, strategies,
-            initial_allocation, config
-        )
+        try:
+            # Initialize exchange
+            logger.info(f"Initializing exchange for bot {name}")
+            exchange = BinanceExchange(paper_trading=config.get('paper_trading', True))
+            
+            # Initialize risk manager
+            logger.info(f"Initializing risk manager for bot {name}")
+            risk_limits = RiskLimits(
+                max_position_size=config.get('max_position_size', 0.1),
+                max_portfolio_risk=config.get('max_portfolio_risk', 0.02),
+                max_daily_loss=config.get('max_daily_loss', 0.05),
+                max_drawdown=config.get('max_drawdown', 0.15),
+                max_open_positions=config.get('max_open_positions', 5),
+                max_trades_per_day=config.get('max_trades_per_day', 10)
+            )
+            risk_manager = AdvancedRiskManager(risk_limits)
+            
+            # Initialize strategies
+            logger.info(f"Initializing strategies for bot {name}")
+            strategies = [
+                MomentumPunchStrategy(config.get('momentum_params')),
+                ValuePunchStrategy(config.get('value_params')),
+                BreakoutPunchStrategy(config.get('breakout_params')),
+                TrendPunchStrategy(config.get('trend_params'))
+            ]
+            
+            # Initial equal allocation
+            initial_allocation = {strategy.name: 0.25 for strategy in strategies}
+            
+            logger.info(f"Calling super().__init__ for bot {name}")
+            super().__init__(
+                bot_id, name, exchange, risk_manager, strategies,
+                initial_allocation, config
+            )
+        except Exception as e:
+            logger.error(f"Error in AdaptiveMultiStrategyBot.__init__: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
         
         # Bot-specific configuration
         self.symbols = symbols

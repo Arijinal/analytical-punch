@@ -95,9 +95,9 @@ class BreakoutPunchStrategy(TradingStrategy):
             std_dev=self.parameters['bb_std']
         )
         self.atr = ATRIndicator(period=self.parameters['atr_period'])
-        self.sma_fast = SMAIndicator(period=self.parameters['sma_fast'])
-        self.sma_slow = SMAIndicator(period=self.parameters['sma_slow'])
-        self.ema = EMAIndicator(period=self.parameters['ema_period'])
+        self.sma_fast = SMAIndicator(periods=[self.parameters['sma_fast']])
+        self.sma_slow = SMAIndicator(periods=[self.parameters['sma_slow']])
+        self.ema = EMAIndicator(periods=[self.parameters['ema_period']])
         self.volume_roc = VolumeROCIndicator(period=5)
         self.obv = OBVIndicator()
     

@@ -31,13 +31,13 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
       actions.push(
         <button
           key="start"
-          className="action-btn start"
+          className="bot-action-btn primary"
           onClick={(e) => {
             e.stopPropagation();
             onBotAction(bot.bot_id, 'start');
           }}
         >
-          Start
+          ▶️ Start
         </button>
       );
     }
@@ -46,25 +46,25 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
       actions.push(
         <button
           key="pause"
-          className="action-btn pause"
+          className="bot-action-btn secondary"
           onClick={(e) => {
             e.stopPropagation();
             onBotAction(bot.bot_id, 'pause');
           }}
         >
-          Pause
+          ⏸️ Pause
         </button>
       );
       actions.push(
         <button
           key="stop"
-          className="action-btn stop"
+          className="bot-action-btn danger"
           onClick={(e) => {
             e.stopPropagation();
             onBotAction(bot.bot_id, 'stop');
           }}
         >
-          Stop
+          ⏹️ Stop
         </button>
       );
     }
@@ -73,25 +73,25 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
       actions.push(
         <button
           key="resume"
-          className="action-btn start"
+          className="bot-action-btn primary"
           onClick={(e) => {
             e.stopPropagation();
             onBotAction(bot.bot_id, 'resume');
           }}
         >
-          Resume
+          ▶️ Resume
         </button>
       );
       actions.push(
         <button
           key="stop"
-          className="action-btn stop"
+          className="bot-action-btn danger"
           onClick={(e) => {
             e.stopPropagation();
             onBotAction(bot.bot_id, 'stop');
           }}
         >
-          Stop
+          ⏹️ Stop
         </button>
       );
     }
@@ -102,11 +102,19 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
   if (bots.length === 0) {
     return (
       <div className="bot-list">
-        <h2>Trading Bots</h2>
+        <div className="bot-list-header">
+          <h2>Trading Bots</h2>
+        </div>
         <div className="empty-state">
-          <div className="empty-icon">🤖</div>
+          <span className="empty-icon">🤖</span>
           <h3>No Trading Bots</h3>
           <p>Create your first trading bot to get started</p>
+          <button 
+            className="create-first-bot-btn"
+            onClick={() => document.querySelector('.nav-tab:nth-child(2)')?.click()}
+          >
+            Create Your First Bot
+          </button>
         </div>
       </div>
     );
@@ -114,15 +122,26 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
 
   return (
     <div className="bot-list fade-in">
-      <div className="list-header">
+      <div className="bot-list-header">
         <h2>Trading Bots ({bots.length})</h2>
-        <div className="list-filters">
-          <select className="filter-select">
-            <option value="all">All Bots</option>
-            <option value="running">Running</option>
-            <option value="paused">Paused</option>
-            <option value="stopped">Stopped</option>
-          </select>
+        <div className="list-view-toggle">
+          <button className="view-btn active">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="1" y="1" width="6" height="6" rx="1"/>
+              <rect x="9" y="1" width="6" height="6" rx="1"/>
+              <rect x="1" y="9" width="6" height="6" rx="1"/>
+              <rect x="9" y="9" width="6" height="6" rx="1"/>
+            </svg>
+            Grid
+          </button>
+          <button className="view-btn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+              <rect x="1" y="2" width="14" height="2" rx="1"/>
+              <rect x="1" y="7" width="14" height="2" rx="1"/>
+              <rect x="1" y="12" width="14" height="2" rx="1"/>
+            </svg>
+            List
+          </button>
         </div>
       </div>
 
@@ -133,46 +152,34 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
             className={`bot-card ${bot.status}`}
             onClick={() => onBotSelect(bot)}
           >
-            <div className="bot-header">
-              <h3 className="bot-name">{bot.name}</h3>
-              <span 
-                className={`bot-status ${bot.status}`}
-                style={{ backgroundColor: getStatusColor(bot.status) }}
-              >
+            <div className="bot-card-header">
+              <div className="bot-info">
+                <h3>{bot.name}</h3>
+                <p>{bot.description || 'Multi-strategy trading bot'}</p>
+              </div>
+              <div className={`bot-status ${bot.status}`}>
+                <span className="status-indicator"></span>
                 {bot.status}
-              </span>
+              </div>
             </div>
 
-            <div className="bot-info">
-              <div className="bot-description">
-                {bot.description || 'Multi-strategy trading bot'}
-              </div>
-              <div className="bot-symbols">
-                <strong>Symbols:</strong> {bot.symbols?.join(', ') || 'N/A'}
-              </div>
-              <div className="bot-mode">
-                {bot.paper_trading ? '📝 Paper Trading' : '💰 Live Trading'}
-              </div>
+            <div className="bot-symbols">
+              <small>Trading: {bot.symbols?.join(', ') || 'N/A'} | {bot.paper_trading ? '📝 Paper' : '💰 Live'}</small>
             </div>
 
             <div className="bot-metrics">
               <div className="metric">
-                <span className="metric-label">Portfolio Value</span>
+                <span className="metric-label">Capital</span>
                 <span className="metric-value">
                   {formatCurrency(bot.live_status?.portfolio_value || bot.current_capital || 0)}
                 </span>
               </div>
 
               <div className="metric">
-                <span className="metric-label">Total Return</span>
+                <span className="metric-label">Return</span>
                 <span className={`metric-value ${bot.total_return_pct >= 0 ? 'positive' : 'negative'}`}>
                   {formatPercentage(bot.total_return_pct || 0)}
                 </span>
-              </div>
-
-              <div className="metric">
-                <span className="metric-label">Total Trades</span>
-                <span className="metric-value">{bot.total_trades || 0}</span>
               </div>
 
               <div className="metric">
@@ -183,47 +190,22 @@ const BotList = ({ bots, onBotSelect, onBotAction }) => {
               </div>
 
               <div className="metric">
-                <span className="metric-label">Max Drawdown</span>
-                <span className="metric-value negative">
-                  {bot.max_drawdown ? `${(bot.max_drawdown * 100).toFixed(1)}%` : '0%'}
-                </span>
-              </div>
-
-              <div className="metric">
-                <span className="metric-label">Open Positions</span>
-                <span className="metric-value">
-                  {bot.live_status?.positions || 0}
-                </span>
+                <span className="metric-label">Trades</span>
+                <span className="metric-value">{bot.total_trades || 0}</span>
               </div>
             </div>
 
-            <div className="bot-timing">
-              <div className="timing-item">
-                <span className="timing-label">Created:</span>
-                <span className="timing-value">
-                  {new Date(bot.created_at).toLocaleDateString()}
-                </span>
-              </div>
-              {bot.started_at && (
-                <div className="timing-item">
-                  <span className="timing-label">Started:</span>
-                  <span className="timing-value">
-                    {new Date(bot.started_at).toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </div>
 
             <div className="bot-actions" onClick={(e) => e.stopPropagation()}>
               {renderBotActions(bot)}
               <button
-                className="action-btn details"
+                className="bot-action-btn secondary"
                 onClick={(e) => {
                   e.stopPropagation();
                   onBotSelect(bot);
                 }}
               >
-                Details
+                📊 Details
               </button>
             </div>
           </div>
