@@ -100,17 +100,22 @@ async def create_bot(config: BotConfig, background_tasks: BackgroundTasks):
         
         db_bot = bot_repository.create_bot(bot_data)
         
+        # Extract values from the returned dictionary
+        bot_id = db_bot['id']
+        bot_name = db_bot['name']
+        created_at = db_bot['created_at']
+        
         # Create bot instance
         bot_instance = AdaptiveMultiStrategyBot(
-            bot_id=db_bot.id,
-            name=db_bot.name,
+            bot_id=bot_id,
+            name=bot_name,
             config=config.dict(),
             symbols=config.symbols,
             timeframes=config.timeframes
         )
         
         # Store in active bots
-        active_bots[db_bot.id] = bot_instance
+        active_bots[bot_id] = bot_instance
         
         # Register with safety manager
         safety_manager.register_bot(bot_instance)
@@ -121,16 +126,16 @@ async def create_bot(config: BotConfig, background_tasks: BackgroundTasks):
             component='api',
             event='bot_created',
             message=f"Created trading bot {config.name}",
-            bot_id=db_bot.id
+            bot_id=bot_id
         )
         
         return {
-            'bot_id': db_bot.id,
-            'name': db_bot.name,
+            'bot_id': bot_id,
+            'name': bot_name,
             'status': 'created',
             'paper_trading': config.paper_trading,
             'symbols': config.symbols,
-            'created_at': db_bot.created_at.isoformat()
+            'created_at': created_at.isoformat()
         }
         
     except Exception as e:
@@ -147,28 +152,28 @@ async def get_bots(active_only: bool = Query(False, description="Get only active
         result = []
         for bot in bots:
             bot_data = {
-                'bot_id': bot.id,
-                'name': bot.name,
-                'description': bot.description,
-                'status': bot.status.value,
-                'paper_trading': bot.paper_trading,
-                'symbols': bot.symbols,
-                'timeframes': bot.timeframes,
-                'initial_capital': bot.initial_capital,
-                'current_capital': bot.current_capital,
-                'total_pnl': bot.total_pnl,
-                'total_return_pct': bot.total_return_pct,
-                'max_drawdown': bot.max_drawdown,
-                'total_trades': bot.total_trades,
-                'win_rate': bot.win_rate,
-                'created_at': bot.created_at.isoformat(),
-                'started_at': bot.started_at.isoformat() if bot.started_at else None,
-                'stopped_at': bot.stopped_at.isoformat() if bot.stopped_at else None
+                'bot_id': bot['id'],
+                'name': bot['name'],
+                'description': bot['description'],
+                'status': bot['status'].value if hasattr(bot['status'], 'value') else bot['status'],
+                'paper_trading': bot['paper_trading'],
+                'symbols': bot['symbols'],
+                'timeframes': bot['timeframes'],
+                'initial_capital': bot['initial_capital'],
+                'current_capital': bot['current_capital'],
+                'total_pnl': bot['total_pnl'],
+                'total_return_pct': bot['total_return_pct'],
+                'max_drawdown': bot['max_drawdown'],
+                'total_trades': bot['total_trades'],
+                'win_rate': bot['win_rate'],
+                'created_at': bot['created_at'].isoformat() if bot['created_at'] else None,
+                'started_at': bot['started_at'].isoformat() if bot['started_at'] else None,
+                'stopped_at': bot['stopped_at'].isoformat() if bot['stopped_at'] else None
             }
             
             # Add real-time status if bot is active
-            if bot.id in active_bots:
-                live_status = active_bots[bot.id].get_detailed_status()
+            if bot['id'] in active_bots:
+                live_status = active_bots[bot['id']].get_detailed_status()
                 bot_data.update({
                     'live_status': live_status,
                     'portfolio_value': live_status.get('portfolio_value', 0),

@@ -116,28 +116,71 @@ class TradingBotRepository:
     def __init__(self, db: TradingDatabase = None):
         self.db = db or trading_db
     
-    def create_bot(self, bot_data: Dict[str, Any]) -> TradingBot:
+    def create_bot(self, bot_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new trading bot"""
         with self.db.get_session() as session:
             bot = TradingBot(**bot_data)
             session.add(bot)
             session.flush()
             session.refresh(bot)
-            return bot
+            
+            # Return a dictionary instead of the ORM object to avoid session issues
+            return {
+                'id': bot.id,
+                'name': bot.name,
+                'description': bot.description,
+                'status': bot.status,
+                'config': bot.config,
+                'strategies': bot.strategies,
+                'symbols': bot.symbols,
+                'timeframes': bot.timeframes,
+                'paper_trading': bot.paper_trading,
+                'initial_capital': bot.initial_capital,
+                'current_capital': bot.current_capital,
+                'created_at': bot.created_at,
+                'updated_at': bot.updated_at
+            }
     
     def get_bot(self, bot_id: str) -> Optional[TradingBot]:
         """Get trading bot by ID"""
         with self.db.get_session() as session:
             return session.query(TradingBot).filter(TradingBot.id == bot_id).first()
     
-    def get_all_bots(self, active_only: bool = False) -> List[TradingBot]:
+    def get_all_bots(self, active_only: bool = False) -> List[Dict[str, Any]]:
         """Get all trading bots"""
         with self.db.get_session() as session:
             query = session.query(TradingBot)
             if active_only:
                 from app.models.trading import BotStatus
                 query = query.filter(TradingBot.status.in_([BotStatus.RUNNING, BotStatus.PAUSED]))
-            return query.all()
+            
+            bots = query.all()
+            # Convert to dictionaries to avoid session issues
+            return [
+                {
+                    'id': bot.id,
+                    'name': bot.name,
+                    'description': bot.description,
+                    'status': bot.status,
+                    'config': bot.config,
+                    'strategies': bot.strategies,
+                    'symbols': bot.symbols,
+                    'timeframes': bot.timeframes,
+                    'paper_trading': bot.paper_trading,
+                    'initial_capital': bot.initial_capital,
+                    'current_capital': bot.current_capital,
+                    'total_pnl': bot.total_pnl,
+                    'total_return_pct': bot.total_return_pct,
+                    'max_drawdown': bot.max_drawdown,
+                    'total_trades': bot.total_trades,
+                    'win_rate': bot.win_rate,
+                    'created_at': bot.created_at,
+                    'started_at': bot.started_at,
+                    'stopped_at': bot.stopped_at,
+                    'updated_at': bot.updated_at
+                }
+                for bot in bots
+            ]
     
     def update_bot(self, bot_id: str, updates: Dict[str, Any]) -> bool:
         """Update trading bot"""
