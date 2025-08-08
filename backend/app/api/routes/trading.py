@@ -13,6 +13,7 @@ from app.database.trading_db import (
     bot_repository, order_repository, trade_repository,
     position_repository, alert_repository, log_repository
 )
+from app.models.trading import BotStatus
 from app.core.trading.adaptive_bot import AdaptiveMultiStrategyBot
 from app.core.trading.exchange import BinanceExchange
 from app.core.trading.paper_trader import PaperTradingEngine
@@ -45,7 +46,7 @@ def get_bot_status(bot_id: str) -> str:
 
 def is_bot_running(bot_id: str) -> bool:
     """Check if bot is currently running"""
-    return get_bot_status(bot_id) == 'running'
+    return get_bot_status(bot_id) == BotStatus.RUNNING.value
 
 
 # Pydantic models
@@ -339,6 +340,55 @@ async def delete_bot(bot_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _restore_bot_from_database(bot_id: str) -> AdaptiveMultiStrategyBot:
+    """Restore a bot instance from database configuration"""
+    try:
+        bot_data = bot_repository.get_bot(bot_id)
+        if not bot_data:
+            raise HTTPException(status_code=404, detail="Bot not found")
+        
+        # Get the config from the database (already parsed as dict)
+        config_dict = bot_data['config']
+        if isinstance(config_dict, str):
+            import json
+            config_dict = json.loads(config_dict)
+        
+        # Create bot instance
+        bot_instance = AdaptiveMultiStrategyBot(
+            bot_id=bot_id,
+            name=bot_data['name'],
+            config={
+                'paper_trading': config_dict.get('paper_trading', True),
+                'initial_capital': config_dict.get('initial_capital', 10000),
+                'max_position_size': config_dict.get('max_position_size', 0.1),
+                'max_daily_loss': config_dict.get('max_daily_loss', 0.05),
+                'max_drawdown': config_dict.get('max_drawdown', 0.15),
+                'max_open_positions': config_dict.get('max_open_positions', 5),
+                'update_interval': config_dict.get('update_interval', 300),
+                'rebalance_interval': config_dict.get('rebalance_interval', 3600),
+                'momentum_params': config_dict.get('momentum_params'),
+                'value_params': config_dict.get('value_params'),
+                'breakout_params': config_dict.get('breakout_params'),
+                'trend_params': config_dict.get('trend_params')
+            },
+            symbols=bot_data['symbols'],
+            timeframes=bot_data['timeframes']
+        )
+        
+        # Store in active bots
+        active_bots[bot_id] = bot_instance
+        
+        # Register with safety manager
+        safety_manager.register_bot(bot_instance)
+        
+        logger.info(f"Restored bot {bot_data['name']} ({bot_id}) from database")
+        return bot_instance
+        
+    except Exception as e:
+        logger.error(f"Error restoring bot {bot_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to restore bot: {e}")
+
+
 async def _start_bot_with_error_handling(bot_id: str, bot_instance):
     """Wrapper function to handle bot startup with proper error handling"""
     try:
@@ -346,7 +396,7 @@ async def _start_bot_with_error_handling(bot_id: str, bot_instance):
         
         # Set status to starting
         bot_repository.update_bot(bot_id, {
-            'status': 'starting',
+            'status': BotStatus.STARTING,
             'started_at': datetime.utcnow()
         })
         
@@ -356,7 +406,7 @@ async def _start_bot_with_error_handling(bot_id: str, bot_instance):
         # If we get here, the bot started successfully
         # Update database status to running
         bot_repository.update_bot(bot_id, {
-            'status': 'running'
+            'status': BotStatus.RUNNING
         })
         
         logger.info(f"Bot {bot_id} started successfully and is now running")
@@ -366,7 +416,7 @@ async def _start_bot_with_error_handling(bot_id: str, bot_instance):
         
         # Update database status to error
         bot_repository.update_bot(bot_id, {
-            'status': 'error',
+            'status': BotStatus.ERROR,
             'stopped_at': datetime.utcnow()
         })
         
@@ -389,28 +439,31 @@ async def start_bot(bot_id: str, background_tasks: BackgroundTasks):
         if not bot:
             raise HTTPException(status_code=404, detail="Bot not found")
         
-        if bot_id in active_bots:
-            bot_instance = active_bots[bot_id]
-            
-            # Check if bot is already running
-            if bot_instance.status.value == 'running':
-                return {'message': 'Bot is already running', 'bot_id': bot_id}
-            
-            # Start bot with error handling in background
-            background_tasks.add_task(_start_bot_with_error_handling, bot_id, bot_instance)
-            
-            # Log start initiation
-            log_repository.log_event(
-                level='INFO',
-                component='api',
-                event='bot_start_initiated',
-                message=f"Bot start initiated for {bot['name']}",
-                bot_id=bot_id
-            )
-            
-            return {'message': 'Bot start initiated', 'bot_id': bot_id}
+        # Get or restore bot instance
+        if bot_id not in active_bots:
+            # Bot not in memory, restore from database
+            logger.info(f"Bot {bot_id} not in memory, restoring from database")
+            bot_instance = await _restore_bot_from_database(bot_id)
         else:
-            raise HTTPException(status_code=400, detail="Bot instance not found")
+            bot_instance = active_bots[bot_id]
+        
+        # Check if bot is already running
+        if bot_instance.status.value == BotStatus.RUNNING.value:
+            return {'message': 'Bot is already running', 'bot_id': bot_id}
+        
+        # Start bot with error handling in background
+        background_tasks.add_task(_start_bot_with_error_handling, bot_id, bot_instance)
+        
+        # Log start initiation
+        log_repository.log_event(
+            level='INFO',
+            component='api',
+            event='bot_start_initiated',
+            message=f"Bot start initiated for {bot['name']}",
+            bot_id=bot_id
+        )
+        
+        return {'message': 'Bot start initiated', 'bot_id': bot_id}
         
     except HTTPException:
         raise
@@ -433,7 +486,7 @@ async def stop_bot(bot_id: str):
             
             # Update database
             bot_repository.update_bot(bot_id, {
-                'status': 'stopped',
+                'status': BotStatus.STOPPED,
                 'stopped_at': datetime.utcnow()
             })
             
@@ -468,7 +521,7 @@ async def pause_bot(bot_id: str):
         await bot_instance.pause()
         
         # Update database
-        bot_repository.update_bot(bot_id, {'status': 'paused'})
+        bot_repository.update_bot(bot_id, {'status': BotStatus.PAUSED})
         
         return {'message': 'Bot paused successfully', 'bot_id': bot_id}
         
@@ -490,7 +543,7 @@ async def resume_bot(bot_id: str):
         await bot_instance.resume()
         
         # Update database
-        bot_repository.update_bot(bot_id, {'status': 'running'})
+        bot_repository.update_bot(bot_id, {'status': BotStatus.RUNNING})
         
         return {'message': 'Bot resumed successfully', 'bot_id': bot_id}
         
@@ -822,8 +875,8 @@ async def get_system_status():
     try:
         return {
             'active_bots': len(active_bots),
-            'running_bots': len([b for b in active_bots.values() if b.status.value == 'running']),
-            'paused_bots': len([b for b in active_bots.values() if b.status.value == 'paused']),
+            'running_bots': len([b for b in active_bots.values() if b.status.value == BotStatus.RUNNING.value]),
+            'paused_bots': len([b for b in active_bots.values() if b.status.value == BotStatus.PAUSED.value]),
             'safety_monitoring': safety_manager.monitoring_active,
             'paper_trading_available': True,
             'timestamp': datetime.utcnow().isoformat()

@@ -23,9 +23,9 @@ const TradingDashboard = () => {
 
   const loadDashboardData = async () => {
     try {
-      // Load bots
+      // Load bots - API returns array directly, not nested under 'bots' property
       const botsData = await api.getBots();
-      setBots(botsData.bots || []);
+      setBots(Array.isArray(botsData) ? botsData : botsData.bots || []);
 
       // Load system status
       const statusData = await api.getSystemStatus();
@@ -114,7 +114,7 @@ const TradingDashboard = () => {
           </div>
           <div className="stat-item">
             <span className="stat-label">Total Bots</span>
-            <span className="stat-value">{systemStatus.active_bots || 0}</span>
+            <span className="stat-value">{bots.length || 0}</span>
           </div>
           <div className="stat-item">
             <span className="stat-label">Alerts</span>

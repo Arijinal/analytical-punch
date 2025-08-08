@@ -18,6 +18,7 @@ Base = declarative_base()
 
 class BotStatus(Enum):
     STOPPED = "stopped"
+    STARTING = "starting"
     RUNNING = "running"
     PAUSED = "paused"
     ERROR = "error"

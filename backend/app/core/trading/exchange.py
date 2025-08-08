@@ -60,8 +60,10 @@ class BinanceExchange(ExchangeInterface):
                     raise ValueError("Binance API credentials not configured for live trading")
                 self.exchange = ccxt.binance(exchange_config)
             
-            # Test connection
-            await self.exchange.load_markets()
+            # Test connection (only for live trading)
+            if not self.paper_trading:
+                await self.exchange.load_markets()
+            
             self.connected = True
             
             logger.info(f"Connected to Binance ({'paper' if self.paper_trading else 'live'} trading)")
